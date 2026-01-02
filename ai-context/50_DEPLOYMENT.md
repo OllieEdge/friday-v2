@@ -30,3 +30,7 @@ Friday v2 can run in a few modes depending on `.env`:
 
 - Seat-based (preferred): `FRIDAY_RUNNER=codex` (requires Codex CLI device login in Settings → Accounts).
 - Metered fallback: `FRIDAY_RUNNER=openai` + `OPENAI_API_KEY=...` (uses the OpenAI API; pay-per-use).
+
+Codex runner options:
+
+- `CODEX_MODEL=...` forces the model passed to `codex exec --model ...` (use the exact model string you want).

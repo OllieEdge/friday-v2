@@ -101,15 +101,30 @@ function buildPrompt({ contextText, chatMessages }) {
   return sys + convo + "\n\nASSISTANT:";
 }
 
-async function runCodexExec({ codexPath, codexHomePath, repoRoot, promptText }) {
+async function runCodexExec({ codexPath, codexHomePath, repoRoot, promptText, model }) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "friday-v2-"));
   const outPath = path.join(tmpDir, "last.txt");
 
   try {
     await new Promise((resolve, reject) => {
+      const args = [
+        "exec",
+        "-",
+        "--output-last-message",
+        outPath,
+        "--sandbox",
+        "read-only",
+        "--color",
+        "never",
+        "--cd",
+        repoRoot,
+      ];
+      const modelName = String(model || "").trim();
+      if (modelName) args.splice(2, 0, "--model", modelName);
+
       const child = spawn(
         codexPath,
-        ["exec", "-", "--output-last-message", outPath, "--sandbox", "read-only", "--color", "never", "--cd", repoRoot],
+        args,
         {
           env: { ...process.env, CODEX_HOME: codexHomePath },
           stdio: ["pipe", "pipe", "pipe"],

@@ -40,6 +40,7 @@ async function runCodex({ context, chat, getActiveCodexProfile }) {
     codexHomePath: profile.codexHomePath,
     repoRoot: path.resolve(ROOT_DIR),
     promptText,
+    model: envString("CODEX_MODEL", ""),
   });
 }
 
