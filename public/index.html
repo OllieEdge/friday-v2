@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Friday v2</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebarHeader">
+          <div class="brand">Friday v2</div>
+          <button id="newChatBtn" class="btn">New</button>
+        </div>
+        <div id="chatList" class="chatList"></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="chatTitle" id="chatTitle">Select a chat</div>
+          <button id="toggleContextBtn" class="btn secondary">Context</button>
+        </header>
+
+        <section id="contextPanel" class="contextPanel hidden">
+          <div class="contextHeader">Loaded context</div>
+          <pre id="contextBody" class="contextBody"></pre>
+        </section>
+
+        <section id="messages" class="messages"></section>
+
+        <form id="composer" class="composer">
+          <textarea id="composerInput" rows="3" placeholder="Message Friday…"></textarea>
+          <button class="btn primary" type="submit">Send</button>
+        </form>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
+

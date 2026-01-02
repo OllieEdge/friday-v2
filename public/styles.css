@@ -1,0 +1,229 @@
+:root {
+  --bg: #0b0f15;
+  --panel: #0f1622;
+  --panel2: #0c131f;
+  --text: #e7eefc;
+  --muted: #a3b1cc;
+  --border: rgba(255, 255, 255, 0.08);
+  --accent: #7aa2ff;
+  --accent2: #2dd4bf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: radial-gradient(1200px 700px at 30% -20%, rgba(122, 162, 255, 0.25), transparent 60%),
+    radial-gradient(900px 600px at 110% 10%, rgba(45, 212, 191, 0.18), transparent 55%),
+    var(--bg);
+  color: var(--text);
+}
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 35%), var(--panel2);
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.chatList {
+  padding: 10px;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.chatItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.chatItem:hover {
+  border-color: rgba(122, 162, 255, 0.35);
+}
+
+.chatItem.active {
+  border-color: rgba(122, 162, 255, 0.7);
+  box-shadow: 0 0 0 1px rgba(122, 162, 255, 0.25) inset;
+}
+
+.chatItemTitle {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.chatItemMeta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.main {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.chatTitle {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70ch;
+}
+
+.contextPanel {
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.12);
+  padding: 10px 16px;
+}
+
+.contextPanel.hidden {
+  display: none;
+}
+
+.contextHeader {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.contextBody {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  color: rgba(231, 238, 252, 0.9);
+}
+
+.messages {
+  padding: 18px 16px;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+}
+
+.msg {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  max-width: 920px;
+}
+
+.msg.user {
+  margin-left: auto;
+  border-color: rgba(45, 212, 191, 0.25);
+}
+
+.msg.assistant {
+  margin-right: auto;
+  border-color: rgba(122, 162, 255, 0.25);
+}
+
+.msgRole {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.msgContent {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+textarea {
+  width: 100%;
+  resize: none;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text);
+  padding: 10px 10px;
+  font: inherit;
+  line-height: 1.35;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: rgba(122, 162, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(122, 162, 255, 0.14);
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.btn.primary {
+  border-color: rgba(122, 162, 255, 0.35);
+  background: rgba(122, 162, 255, 0.15);
+}
+
+.btn.secondary {
+  border-color: rgba(45, 212, 191, 0.28);
+  background: rgba(45, 212, 191, 0.12);
+}
+
