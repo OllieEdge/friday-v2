@@ -52,7 +52,8 @@ function runCodexLoginStatus({ codexPath, codexHomePath }) {
     child.on("close", (code) => {
       const text = stripAnsi(out).trim();
       const loggedIn = code === 0 && !/not logged in/i.test(text);
-      resolve({ ok: code === 0, exitCode: code ?? null, loggedIn, text });
+      const authMode = /api key/i.test(text) ? "api_key" : loggedIn ? "device" : "unknown";
+      resolve({ ok: code === 0, exitCode: code ?? null, loggedIn, authMode, text });
     });
   });
 }
@@ -101,62 +102,73 @@ function buildPrompt({ contextText, chatMessages }) {
   return sys + convo + "\n\nASSISTANT:";
 }
 
-async function runCodexExec({ codexPath, codexHomePath, repoRoot, promptText, model, sandboxMode, configOverrides }) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "friday-v2-"));
-  const outPath = path.join(tmpDir, "last.txt");
+async function runCodexExec({
+  codexPath,
+  codexHomePath,
+  repoRoot,
+  promptText,
+  model,
+  sandboxMode,
+  configOverrides,
+  onJsonEvent,
+}) {
+  return new Promise((resolve, reject) => {
+    const sandbox = String(sandboxMode || "").trim() || "read-only";
+    const args = ["exec", "-", "--json", "--sandbox", sandbox, "--color", "never", "--cd", repoRoot];
 
-  try {
-    await new Promise((resolve, reject) => {
-      const sandbox = String(sandboxMode || "").trim() || "read-only";
-      const args = [
-        "exec",
-        "-",
-        "--output-last-message",
-        outPath,
-        "--sandbox",
-        sandbox,
-        "--color",
-        "never",
-        "--cd",
-        repoRoot,
-      ];
+    const modelName = String(model || "").trim();
+    if (modelName) args.splice(2, 0, "--model", modelName);
 
-      const modelName = String(model || "").trim();
-      if (modelName) args.splice(2, 0, "--model", modelName);
-
-      const overrides = Array.isArray(configOverrides) ? configOverrides : [];
-      for (const o of overrides) {
-        const ov = String(o || "").trim();
-        if (!ov) continue;
-        args.splice(2, 0, "-c", ov);
-      }
-
-      const child = spawn(
-        codexPath,
-        args,
-        {
-          env: { ...process.env, CODEX_HOME: codexHomePath },
-          stdio: ["pipe", "pipe", "pipe"],
-        },
-      );
-      child.stdin.write(promptText);
-      child.stdin.end();
-      let err = "";
-      child.stderr.on("data", (d) => (err += d.toString("utf8")));
-      child.on("close", (code) => {
-        if (code !== 0) reject(new Error(stripAnsi(err).trim() || `codex exec failed (${code})`));
-        else resolve();
-      });
-    });
-    const txt = fs.existsSync(outPath) ? fs.readFileSync(outPath, "utf8") : "";
-    return String(txt || "").trim();
-  } finally {
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch {
-      // ignore
+    const overrides = Array.isArray(configOverrides) ? configOverrides : [];
+    for (const o of overrides) {
+      const ov = String(o || "").trim();
+      if (!ov) continue;
+      args.splice(2, 0, "-c", ov);
     }
-  }
+
+    const child = spawn(codexPath, args, {
+      env: { ...process.env, CODEX_HOME: codexHomePath },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let lastText = "";
+    let usage = null;
+    let err = "";
+
+    const rl = readline.createInterface({ input: child.stdout });
+    rl.on("line", (line) => {
+      const trimmed = String(line || "").trim();
+      if (!trimmed) return;
+      try {
+        const ev = JSON.parse(trimmed);
+        if (typeof onJsonEvent === "function") onJsonEvent(ev);
+        if (ev?.type === "item.completed" && ev?.item?.type === "agent_message") {
+          lastText = String(ev?.item?.text || "");
+        }
+        if (ev?.type === "turn.completed" && ev?.usage) {
+          usage = {
+            inputTokens: Number(ev.usage.input_tokens) || 0,
+            cachedInputTokens: Number(ev.usage.cached_input_tokens) || 0,
+            outputTokens: Number(ev.usage.output_tokens) || 0,
+          };
+        }
+      } catch {
+        // ignore non-json lines
+      }
+    });
+
+    child.stderr.on("data", (d) => (err += d.toString("utf8")));
+
+    child.on("error", (e) => reject(e));
+    child.on("close", (code) => {
+      rl.close();
+      if (code !== 0) return reject(new Error(stripAnsi(err).trim() || `codex exec failed (${code})`));
+      return resolve({ content: String(lastText || "").trim(), usage });
+    });
+
+    child.stdin.write(promptText);
+    child.stdin.end();
+  });
 }
 
 function parseDeviceInfo(lines) {

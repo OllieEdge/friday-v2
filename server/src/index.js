@@ -58,7 +58,10 @@ registerContext(router, { loadContext });
 registerChats(router, {
   chats,
   loadContext,
-  runAssistant: ({ context, chat }) => runAssistant({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs }),
+  runAssistant: ({ context, chat, onEvent }) =>
+    runAssistant({ context, chat, onEvent, getActiveCodexProfile, getCodexRunnerPrefs }),
+  tasks,
+  codexProfiles,
 });
 registerTasks(router, { tasks });
 registerCodexAccounts(router, { db, codexProfiles, settings, tasks });

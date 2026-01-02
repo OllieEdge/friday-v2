@@ -119,6 +119,13 @@ textarea {
   min-width: 0;
 }
 
+.topbarTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .chatTitle {
   font-weight: 600;
   overflow: hidden;
@@ -208,6 +215,21 @@ textarea {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.runPanel {
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.1);
+  padding: 10px 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.runHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .textarea {
   width: 100%;
   resize: none;
@@ -257,6 +279,10 @@ textarea {
   height: 36px;
   padding: 0;
   justify-content: center;
+}
+
+.mobileOnly {
+  display: none;
 }
 
 .modalOverlay {
@@ -340,3 +366,40 @@ textarea {
   line-height: 1.35;
 }
 
+@media (max-width: 860px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .mobileOnly {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(320px, 88vw);
+    transform: translateX(-110%);
+    transition: transform 160ms ease;
+    z-index: 50;
+    box-shadow: 16px 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .app.sidebarOpen .sidebar {
+    transform: translateX(0);
+  }
+
+  .main {
+    grid-template-rows: auto auto 1fr auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .composer {
+    grid-template-columns: 1fr;
+  }
+
+  .messages {
+    padding: 12px 12px;
+  }
+}

@@ -31,8 +31,14 @@ export type CodexProfile = {
   createdAt: string;
   updatedAt: string;
   lastVerifiedAt: string | null;
+  authMode: "unknown" | "device" | "api_key";
   loggedIn: boolean;
   statusText: string;
+  totalInputTokens: number;
+  totalCachedInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  totalCostUpdatedAt: string | null;
 };
 
 export type CodexAccountsResponse = {
@@ -50,3 +56,10 @@ export type TaskEvent =
   | { type: "device"; url: string; code: string }
   | { type: "done"; ok: boolean; exitCode: number | null }
   | { type: "canceled"; reason: string };
+
+export type ContextMetrics = {
+  files: number;
+  chars: number;
+  bytes: number;
+  approxTokens: number;
+};

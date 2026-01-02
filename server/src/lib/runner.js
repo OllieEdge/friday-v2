@@ -37,13 +37,13 @@ function normalizeReasoningEffort(value) {
   return "";
 }
 
-async function runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs }) {
+async function runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs, onEvent }) {
   const profile = getActiveCodexProfile();
-  if (!profile) return "No active Codex account. Go to Settings → Accounts and set one active.";
+  if (!profile) return { runner: "codex", content: "No active Codex account. Go to Settings → Accounts and set one active." };
   const codexPath = resolveCodexPath();
   const status = await runCodexLoginStatus({ codexPath, codexHomePath: profile.codexHomePath });
   if (!status.loggedIn) {
-    return "Active Codex account is not logged in. Go to Settings → Accounts → Login with code.";
+    return { runner: "codex", content: "Active Codex account is not logged in. Go to Settings → Accounts → Login with code." };
   }
   const contextText = buildContextText(context?.items || []);
   const promptText = buildPrompt({ contextText, chatMessages: chat?.messages || [] });
@@ -54,7 +54,7 @@ async function runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPr
   const configOverrides = ['approval_policy="never"'];
   if (reasoningEffort) configOverrides.push(`model_reasoning_effort="${reasoningEffort}"`);
 
-  return runCodexExec({
+  const result = await runCodexExec({
     codexPath,
     codexHomePath: profile.codexHomePath,
     repoRoot: path.resolve(ROOT_DIR),
@@ -62,7 +62,9 @@ async function runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPr
     model: envString("CODEX_MODEL", ""),
     sandboxMode,
     configOverrides,
+    onJsonEvent: typeof onEvent === "function" ? (ev) => onEvent({ type: "codex", event: ev }) : undefined,
   });
+  return { runner: "codex", content: result.content, usage: result.usage, profileId: profile.id };
 }
 
 async function runOpenAi({ context, chat }) {
@@ -72,24 +74,25 @@ async function runOpenAi({ context, chat }) {
     .filter((m) => m && m.role && m.content != null)
     .map((m) => ({ role: toOpenAiRole(m.role), content: String(m.content || "") }));
 
-  return runOpenAiChat({
+  const result = await runOpenAiChat({
     messages: [{ role: "system", content: system }, ...chatMessages],
   });
+  return { runner: "openai", content: result.content, usage: result.usage };
 }
 
-async function runAssistant({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs }) {
+async function runAssistant({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs, onEvent }) {
   const runner = envString("FRIDAY_RUNNER", "noop").toLowerCase();
-  if (runner === "codex") return runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs });
+  if (runner === "codex") return runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs, onEvent });
   if (runner === "openai" || runner === "api" || runner === "metered") return runOpenAi({ context, chat });
   if (runner === "auto") {
     try {
-      return await runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs });
+      return await runCodex({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs, onEvent });
     } catch {
       // fall through
     }
     if (envString("OPENAI_API_KEY", "")) return runOpenAi({ context, chat });
   }
-  return runNoop({ context });
+  return { runner: "noop", content: await runNoop({ context }) };
 }
 
 module.exports = { runAssistant };

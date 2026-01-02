@@ -12,7 +12,7 @@ function createCodexProfilesQueries(db) {
   function list() {
     return db
       .prepare(
-        "SELECT id, label, codex_home_path AS codexHomePath, created_at AS createdAt, updated_at AS updatedAt, last_verified_at AS lastVerifiedAt, last_status_text AS lastStatusText FROM codex_profiles ORDER BY updated_at DESC;",
+        "SELECT id, label, codex_home_path AS codexHomePath, created_at AS createdAt, updated_at AS updatedAt, last_verified_at AS lastVerifiedAt, last_status_text AS lastStatusText, total_input_tokens AS totalInputTokens, total_cached_input_tokens AS totalCachedInputTokens, total_output_tokens AS totalOutputTokens, total_cost_usd AS totalCostUsd, total_cost_updated_at AS totalCostUpdatedAt FROM codex_profiles ORDER BY updated_at DESC;",
       )
       .all();
   }
@@ -20,7 +20,7 @@ function createCodexProfilesQueries(db) {
   function get(profileId) {
     return db
       .prepare(
-        "SELECT id, label, codex_home_path AS codexHomePath, created_at AS createdAt, updated_at AS updatedAt, last_verified_at AS lastVerifiedAt, last_status_text AS lastStatusText FROM codex_profiles WHERE id = ?;",
+        "SELECT id, label, codex_home_path AS codexHomePath, created_at AS createdAt, updated_at AS updatedAt, last_verified_at AS lastVerifiedAt, last_status_text AS lastStatusText, total_input_tokens AS totalInputTokens, total_cached_input_tokens AS totalCachedInputTokens, total_output_tokens AS totalOutputTokens, total_cost_usd AS totalCostUsd, total_cost_updated_at AS totalCostUpdatedAt FROM codex_profiles WHERE id = ?;",
       )
       .get(profileId);
   }
@@ -50,8 +50,26 @@ function createCodexProfilesQueries(db) {
     db.prepare("DELETE FROM codex_profiles WHERE id = ?;").run(id);
   }
 
-  return { list, get, create, touchStatus, remove };
+  function addUsage({ id, inputTokens, cachedInputTokens, outputTokens, costUsd }) {
+    const now = nowIso();
+    const inTok = Number(inputTokens) || 0;
+    const cachedTok = Number(cachedInputTokens) || 0;
+    const outTok = Number(outputTokens) || 0;
+    const cost = costUsd == null ? null : Number(costUsd);
+
+    if (cost == null || !Number.isFinite(cost)) {
+      db.prepare(
+        "UPDATE codex_profiles SET total_input_tokens = total_input_tokens + ?, total_cached_input_tokens = total_cached_input_tokens + ?, total_output_tokens = total_output_tokens + ?, updated_at = ? WHERE id = ?;",
+      ).run(inTok, cachedTok, outTok, now, id);
+      return;
+    }
+
+    db.prepare(
+      "UPDATE codex_profiles SET total_input_tokens = total_input_tokens + ?, total_cached_input_tokens = total_cached_input_tokens + ?, total_output_tokens = total_output_tokens + ?, total_cost_usd = total_cost_usd + ?, total_cost_updated_at = ?, updated_at = ? WHERE id = ?;",
+    ).run(inTok, cachedTok, outTok, cost, now, now, id);
+  }
+
+  return { list, get, create, touchStatus, addUsage, remove };
 }
 
 module.exports = { createCodexProfilesQueries };
-

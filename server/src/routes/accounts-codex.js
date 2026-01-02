@@ -38,15 +38,17 @@ function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
     for (const p of profiles) {
       let statusText = "";
       let loggedIn = false;
+      let authMode = "unknown";
       try {
         const status = await runCodexLoginStatus({ codexPath, codexHomePath: p.codexHomePath });
         statusText = status.text;
         loggedIn = status.loggedIn;
+        authMode = status.authMode || "unknown";
         codexProfiles.touchStatus({ id: p.id, lastVerifiedAt: nowIso(), lastStatusText: statusText });
       } catch (e) {
         statusText = `status_error: ${String(e?.message || e)}`;
       }
-      enriched.push({ ...p, loggedIn, statusText });
+      enriched.push({ ...p, loggedIn, authMode, statusText });
     }
 
     return sendJson(res, 200, {

@@ -50,11 +50,17 @@ async function runOpenAiChat({ messages }) {
 
     const json = JSON.parse(text);
     const content = json?.choices?.[0]?.message?.content;
-    return String(content || "").trim();
+    const usage = json?.usage
+      ? {
+          inputTokens: Number(json.usage.prompt_tokens) || 0,
+          cachedInputTokens: 0,
+          outputTokens: Number(json.usage.completion_tokens) || 0,
+        }
+      : null;
+    return { content: String(content || "").trim(), usage };
   } finally {
     clearTimeout(t);
   }
 }
 
 module.exports = { buildOpenAiSystemText, runOpenAiChat };
-

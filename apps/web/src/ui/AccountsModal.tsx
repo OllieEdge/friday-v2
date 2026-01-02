@@ -1,7 +1,7 @@
 import { Check, Copy, KeyRound, LogOut, Trash2, UserPlus, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { CodexAccountsResponse, TaskEvent } from "../api/types";
+import type { CodexAccountsResponse, ContextMetrics, TaskEvent } from "../api/types";
 
 type CreateProfileResponse = { ok: true; profileId: string };
 type ActivateResponse = { ok: true };
@@ -44,10 +44,12 @@ export function AccountsModal({
   onClose,
   accounts,
   refreshAccounts,
+  contextMetrics,
 }: {
   onClose: () => void;
   accounts: CodexAccountsResponse | null;
   refreshAccounts: () => Promise<void>;
+  contextMetrics: ContextMetrics | null;
 }) {
   const [newLabel, setNewLabel] = useState("");
   const [loginTaskId, setLoginTaskId] = useState<string | null>(null);
@@ -67,6 +69,16 @@ export function AccountsModal({
     if (!activeId) return null;
     return accounts?.profiles.find((p) => p.id === activeId) ?? null;
   }, [accounts, activeId]);
+
+  const activeUsage = useMemo(() => {
+    if (!active) return null;
+    const inTok = Number(active.totalInputTokens) || 0;
+    const cachedTok = Number(active.totalCachedInputTokens) || 0;
+    const outTok = Number(active.totalOutputTokens) || 0;
+    const totalTok = inTok + cachedTok + outTok;
+    const cost = Number(active.totalCostUsd) || 0;
+    return { inTok, cachedTok, outTok, totalTok, cost, updatedAt: active.totalCostUpdatedAt };
+  }, [active]);
 
   async function createProfile() {
     const label = newLabel.trim();
@@ -125,6 +137,28 @@ export function AccountsModal({
               <div className="muted">Multiple Codex profiles (shared globally). Active profile is used for the runner.</div>
             </div>
             <div className="pill pillActive">{active ? `Active: ${active.label}` : "No active"}</div>
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontWeight: 700 }}>Overview</div>
+            <div className="muted">
+              Context size:{" "}
+              {contextMetrics
+                ? `${contextMetrics.files} files · ${contextMetrics.chars.toLocaleString()} chars (~${contextMetrics.approxTokens.toLocaleString()} tokens)`
+                : "unknown"}
+            </div>
+            {active && activeUsage ? (
+              <div className="muted">
+                Active account auth: {active.authMode === "api_key" ? "API key (metered)" : active.authMode}
+                {" · "}
+                Usage: {activeUsage.totalTok.toLocaleString()} tokens
+                {activeUsage.cost > 0
+                  ? ` · $${activeUsage.cost.toFixed(2)}`
+                  : active.authMode === "api_key" && activeUsage.totalTok > 0
+                    ? " · cost unknown (set METERED_USD_PER_1K_* in .env)"
+                    : ""}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>
