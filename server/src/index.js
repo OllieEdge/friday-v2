@@ -44,6 +44,13 @@ function getActiveCodexProfile() {
   return codexProfiles.get(id);
 }
 
+function getCodexRunnerPrefs() {
+  return {
+    sandboxMode: settings.get("codex_sandbox_mode") || "read-only",
+    reasoningEffort: settings.get("codex_reasoning_effort") || "",
+  };
+}
+
 const router = createRouter();
 
 registerHealth(router);
@@ -51,7 +58,7 @@ registerContext(router, { loadContext });
 registerChats(router, {
   chats,
   loadContext,
-  runAssistant: ({ context, chat }) => runAssistant({ context, chat, getActiveCodexProfile }),
+  runAssistant: ({ context, chat }) => runAssistant({ context, chat, getActiveCodexProfile, getCodexRunnerPrefs }),
 });
 registerTasks(router, { tasks });
 registerCodexAccounts(router, { db, codexProfiles, settings, tasks });

@@ -10,11 +10,28 @@ const {
 } = require("../lib/codex");
 
 const ACTIVE_KEY = "active_codex_profile_id";
+const SANDBOX_KEY = "codex_sandbox_mode";
+const REASONING_KEY = "codex_reasoning_effort";
+
+const SANDBOX_MODES = new Set(["read-only", "workspace-write", "danger-full-access"]);
+const REASONING_EFFORTS = new Set(["", "none", "low", "medium", "high"]);
+
+function safeSandboxMode(value) {
+  const v = String(value || "").trim();
+  return SANDBOX_MODES.has(v) ? v : "read-only";
+}
+
+function safeReasoningEffort(value) {
+  const v = String(value || "").trim().toLowerCase();
+  return REASONING_EFFORTS.has(v) ? v : "";
+}
 
 function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
   router.add("GET", "/api/accounts/codex", async (_req, res) => {
     const codexPath = resolveCodexPath();
     const activeProfileId = settings.get(ACTIVE_KEY);
+    const sandboxMode = safeSandboxMode(settings.get(SANDBOX_KEY));
+    const reasoningEffort = safeReasoningEffort(settings.get(REASONING_KEY));
     const profiles = codexProfiles.list();
 
     const enriched = [];
@@ -32,7 +49,21 @@ function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
       enriched.push({ ...p, loggedIn, statusText });
     }
 
-    return sendJson(res, 200, { ok: true, activeProfileId: activeProfileId || null, profiles: enriched });
+    return sendJson(res, 200, {
+      ok: true,
+      activeProfileId: activeProfileId || null,
+      profiles: enriched,
+      runner: { sandboxMode, reasoningEffort },
+    });
+  });
+
+  router.add("POST", "/api/accounts/codex/prefs", async (req, res) => {
+    const body = await readJson(req);
+    const sandboxMode = safeSandboxMode(body?.sandboxMode);
+    const reasoningEffort = safeReasoningEffort(body?.reasoningEffort);
+    settings.set(SANDBOX_KEY, sandboxMode);
+    settings.set(REASONING_KEY, reasoningEffort);
+    return sendJson(res, 200, { ok: true, runner: { sandboxMode, reasoningEffort } });
   });
 
   router.add("POST", "/api/accounts/codex", async (req, res) => {

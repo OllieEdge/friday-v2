@@ -101,26 +101,35 @@ function buildPrompt({ contextText, chatMessages }) {
   return sys + convo + "\n\nASSISTANT:";
 }
 
-async function runCodexExec({ codexPath, codexHomePath, repoRoot, promptText, model }) {
+async function runCodexExec({ codexPath, codexHomePath, repoRoot, promptText, model, sandboxMode, configOverrides }) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "friday-v2-"));
   const outPath = path.join(tmpDir, "last.txt");
 
   try {
     await new Promise((resolve, reject) => {
+      const sandbox = String(sandboxMode || "").trim() || "read-only";
       const args = [
         "exec",
         "-",
         "--output-last-message",
         outPath,
         "--sandbox",
-        "read-only",
+        sandbox,
         "--color",
         "never",
         "--cd",
         repoRoot,
       ];
+
       const modelName = String(model || "").trim();
       if (modelName) args.splice(2, 0, "--model", modelName);
+
+      const overrides = Array.isArray(configOverrides) ? configOverrides : [];
+      for (const o of overrides) {
+        const ov = String(o || "").trim();
+        if (!ov) continue;
+        args.splice(2, 0, "-c", ov);
+      }
 
       const child = spawn(
         codexPath,

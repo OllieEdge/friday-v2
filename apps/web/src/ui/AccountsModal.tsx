@@ -8,6 +8,13 @@ type ActivateResponse = { ok: true };
 type StartLoginResponse = { ok: true; taskId: string };
 type LogoutResponse = { ok: true };
 type DeleteResponse = { ok: true };
+type UpdatePrefsResponse = {
+  ok: true;
+  runner: {
+    sandboxMode: "read-only" | "workspace-write" | "danger-full-access";
+    reasoningEffort: "" | "none" | "low" | "medium" | "high";
+  };
+};
 
 function useTaskStream(taskId: string | null) {
   const [events, setEvents] = useState<TaskEvent[]>([]);
@@ -47,6 +54,14 @@ export function AccountsModal({
   const { device, events, done } = useTaskStream(loginTaskId);
 
   const activeId = accounts?.activeProfileId ?? null;
+  const [sandboxMode, setSandboxMode] = useState<UpdatePrefsResponse["runner"]["sandboxMode"]>("read-only");
+  const [reasoningEffort, setReasoningEffort] = useState<UpdatePrefsResponse["runner"]["reasoningEffort"]>("");
+
+  React.useEffect(() => {
+    if (!accounts?.runner) return;
+    setSandboxMode(accounts.runner.sandboxMode);
+    setReasoningEffort(accounts.runner.reasoningEffort);
+  }, [accounts?.runner?.sandboxMode, accounts?.runner?.reasoningEffort]);
 
   const active = useMemo(() => {
     if (!activeId) return null;
@@ -86,6 +101,14 @@ export function AccountsModal({
     await refreshAccounts();
   }
 
+  async function savePrefs() {
+    await api<UpdatePrefsResponse>("/api/accounts/codex/prefs", {
+      method: "POST",
+      body: JSON.stringify({ sandboxMode, reasoningEffort }),
+    });
+    await refreshAccounts();
+  }
+
   return (
     <div className="modalOverlay" role="dialog" aria-modal="true">
       <div className="modal">
@@ -102,6 +125,38 @@ export function AccountsModal({
               <div className="muted">Multiple Codex profiles (shared globally). Active profile is used for the runner.</div>
             </div>
             <div className="pill pillActive">{active ? `Active: ${active.label}` : "No active"}</div>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontWeight: 700 }}>Runner preferences</div>
+            <div className="row">
+              <label style={{ flex: 1, display: "grid", gap: 6 }}>
+                <div className="muted">Access mode</div>
+                <select className="input" value={sandboxMode} onChange={(e) => setSandboxMode(e.target.value as any)}>
+                  <option value="read-only">Read-only</option>
+                  <option value="workspace-write">Workspace write</option>
+                  <option value="danger-full-access">Danger full access</option>
+                </select>
+              </label>
+              <label style={{ flex: 1, display: "grid", gap: 6 }}>
+                <div className="muted">Reasoning level</div>
+                <select
+                  className="input"
+                  value={reasoningEffort}
+                  onChange={(e) => setReasoningEffort(e.target.value as any)}
+                >
+                  <option value="">Default</option>
+                  <option value="none">None</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <button className="btn" onClick={() => savePrefs()}>
+                Save
+              </button>
+            </div>
+            <div className="muted">These persist in Friday and apply to new messages.</div>
           </div>
 
           <div className="row">
@@ -194,4 +249,3 @@ export function AccountsModal({
     </div>
   );
 }
-

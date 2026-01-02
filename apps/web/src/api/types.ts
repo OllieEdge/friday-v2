@@ -39,10 +39,14 @@ export type CodexAccountsResponse = {
   ok: true;
   activeProfileId: string | null;
   profiles: CodexProfile[];
+  runner: {
+    sandboxMode: "read-only" | "workspace-write" | "danger-full-access";
+    reasoningEffort: "" | "none" | "low" | "medium" | "high";
+  };
 };
 
 export type TaskEvent =
   | { type: "log"; stream: "stdout" | "stderr"; line: string }
   | { type: "device"; url: string; code: string }
-  | { type: "done"; ok: boolean; exitCode: number | null };
-
+  | { type: "done"; ok: boolean; exitCode: number | null }
+  | { type: "canceled"; reason: string };
