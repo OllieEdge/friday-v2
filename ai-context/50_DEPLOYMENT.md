@@ -17,8 +17,9 @@ Deploy the current Friday v2 repo to the canonical v2 environment:
 
 1) Ensure local changes are committed + pushed to GitHub.
 2) On the Mac mini: pull latest in `/Users/ollie/workspace/friday-v2`.
-3) Restart the LaunchAgent.
-4) Verify `GET https://friday2.edgflix.com/api/health` returns `{ "ok": true }`.
+3) Install deps + build UI:
+   - `cd /Users/ollie/workspace/friday-v2 && npm install && npm run build`
+4) Restart the LaunchAgent.
+5) Verify `GET https://friday2.edgflix.com/api/health` returns `{ "ok": true }`.
 
 If nginx config changed, reload nginx (as the automation sudo user).
-

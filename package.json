@@ -1,0 +1,15 @@
+{
+  "name": "friday-v2",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "server"
+  ],
+  "scripts": {
+    "dev:web": "npm -w apps/web run dev",
+    "dev:server": "npm -w server run dev",
+    "build": "npm -w apps/web run build",
+    "start": "npm -w server run start"
+  }
+}
+

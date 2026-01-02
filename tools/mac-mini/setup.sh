@@ -14,6 +14,9 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && p
 PLIST="$HOME/Library/LaunchAgents/com.friday.v2.plist"
 mkdir -p "$HOME/Library/Logs/friday-v2"
 
+echo "Installing deps + building UI…"
+(cd "$ROOT_DIR" && /opt/homebrew/bin/npm install && /opt/homebrew/bin/npm run build)
+
 cat >"$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -45,4 +48,3 @@ launchctl load "$PLIST"
 sleep 1
 curl -sS --max-time 2 "http://127.0.0.1:3334/api/health"
 echo
-

@@ -1,0 +1,9 @@
+{
+  "name": "@friday-v2/server",
+  "private": true,
+  "scripts": {
+    "dev": "PORT=3333 node server.js",
+    "start": "node server.js"
+  }
+}
+
