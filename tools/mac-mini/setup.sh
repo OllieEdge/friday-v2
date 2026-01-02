@@ -33,6 +33,9 @@ if [[ -z "${NPM_BIN}" || ! -x "${NPM_BIN}" ]]; then
   exit 1
 fi
 
+export PATH
+PATH="$(dirname "${NODE_BIN}")":"$(dirname "${NPM_BIN}")":"${PATH}"
+
 if [[ ! -f "${ROOT_DIR}/.env" && -f "${ROOT_DIR}/.env.example" ]]; then
   echo "Creating .env (default runner=codex)…"
   cat >"${ROOT_DIR}/.env" <<EOF
