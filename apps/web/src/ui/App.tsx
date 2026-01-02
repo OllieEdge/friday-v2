@@ -2,7 +2,7 @@ import { Menu, Plus, Settings2, X } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Chat, ChatSummary, CodexAccountsResponse, ContextBundle, ContextMetrics, Message } from "../api/types";
-import { AccountsModal } from "./AccountsModal";
+import { SettingsPage } from "./SettingsPage";
 
 type ChatsListResponse = { ok: true; chats: ChatSummary[] };
 type ChatResponse = { ok: true; chat: Chat };
@@ -180,6 +180,7 @@ export function App() {
 
   return (
     <div className={`app${sidebarOpen ? " sidebarOpen" : ""}`}>
+      {sidebarOpen ? <button className="sidebarBackdrop" onClick={() => setSidebarOpen(false)} /> : null}
       <aside className="sidebar">
         <div className="sidebarHeader">
           <div className="brand">Friday v2</div>
@@ -287,7 +288,7 @@ export function App() {
       </main>
 
       {settingsOpen ? (
-        <AccountsModal
+        <SettingsPage
           onClose={() => setSettingsOpen(false)}
           accounts={accounts}
           refreshAccounts={refreshAccounts}
