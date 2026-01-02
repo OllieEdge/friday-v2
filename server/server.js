@@ -5,11 +5,15 @@ const { URL } = require("node:url");
 
 const { createStore } = require("./storage");
 const { loadContextBundle } = require("./context-loader");
+const { loadDotEnvIfPresent } = require("./env");
+const { runAssistant } = require("./runner");
 
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
 const CONTEXT_DIR = path.join(ROOT, "ai-context");
+
+loadDotEnvIfPresent(path.join(ROOT, ".env"));
 
 const store = createStore({ dataDir: DATA_DIR });
 
@@ -105,16 +109,17 @@ async function handleApi(req, res, url) {
     const userMsg = store.appendMessage({ chatId, role: "user", content: body?.content ?? "" });
     if (!userMsg) return notFound(res);
 
-    // Placeholder: v2 will invoke a runner (Codex CLI etc). For now, echo back context + message.
     const context = loadContextBundle({ contextDir: CONTEXT_DIR });
-    const assistantContent =
-      "Runner not connected yet.\n\n" +
-      "Loaded context files:\n" +
-      context.files.map((f) => `- ${f}`).join("\n") +
-      "\n\nYour message:\n" +
-      (body?.content ?? "");
+    const chat = store.getChat(chatId);
 
-    const assistantMsg = store.appendMessage({ chatId, role: "assistant", content: assistantContent });
+    let assistantContent;
+    try {
+      assistantContent = await runAssistant({ context, chat });
+    } catch (e) {
+      assistantContent = `Runner error: ${String(e?.message || e)}`;
+    }
+
+    const assistantMsg = store.appendMessage({ chatId, role: "assistant", content: assistantContent || "" });
     return sendJson(res, 201, { ok: true, messages: [userMsg, assistantMsg] });
   }
 
@@ -149,4 +154,3 @@ server.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Friday v2 listening on http://localhost:${PORT}`);
 });
-
