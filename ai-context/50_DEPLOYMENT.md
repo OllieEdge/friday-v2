@@ -23,3 +23,10 @@ Deploy the current Friday v2 repo to the canonical v2 environment:
 5) Verify `GET https://friday2.edgflix.com/api/health` returns `{ "ok": true }`.
 
 If nginx config changed, reload nginx (as the automation sudo user).
+
+## Runner config (quick)
+
+Friday v2 can run in a few modes depending on `.env`:
+
+- Seat-based (preferred): `FRIDAY_RUNNER=codex` (requires Codex CLI device login in Settings → Accounts).
+- Metered fallback: `FRIDAY_RUNNER=openai` + `OPENAI_API_KEY=...` (uses the OpenAI API; pay-per-use).

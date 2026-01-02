@@ -2,11 +2,18 @@ const path = require("node:path");
 const { envString } = require("../config/env");
 const { ROOT_DIR } = require("../config/paths");
 const { buildPrompt, resolveCodexPath, runCodexExec, runCodexLoginStatus } = require("./codex");
+const { buildOpenAiSystemText, runOpenAiChat } = require("./openai");
 
 function buildContextText(contextItems) {
   return (contextItems || [])
     .map((i) => `# ${i.filename}\n\n${String(i.content || "").trim()}\n`)
     .join("\n\n---\n\n");
+}
+
+function toOpenAiRole(role) {
+  const r = String(role || "").toLowerCase();
+  if (r === "assistant") return "assistant";
+  return "user";
 }
 
 async function runNoop({ context }) {
@@ -36,9 +43,30 @@ async function runCodex({ context, chat, getActiveCodexProfile }) {
   });
 }
 
+async function runOpenAi({ context, chat }) {
+  const contextText = buildContextText(context?.items || []);
+  const system = buildOpenAiSystemText({ contextText });
+  const chatMessages = (chat?.messages || [])
+    .filter((m) => m && m.role && m.content != null)
+    .map((m) => ({ role: toOpenAiRole(m.role), content: String(m.content || "") }));
+
+  return runOpenAiChat({
+    messages: [{ role: "system", content: system }, ...chatMessages],
+  });
+}
+
 async function runAssistant({ context, chat, getActiveCodexProfile }) {
   const runner = envString("FRIDAY_RUNNER", "noop").toLowerCase();
   if (runner === "codex") return runCodex({ context, chat, getActiveCodexProfile });
+  if (runner === "openai" || runner === "api" || runner === "metered") return runOpenAi({ context, chat });
+  if (runner === "auto") {
+    try {
+      return await runCodex({ context, chat, getActiveCodexProfile });
+    } catch {
+      // fall through
+    }
+    if (envString("OPENAI_API_KEY", "")) return runOpenAi({ context, chat });
+  }
   return runNoop({ context });
 }
 
