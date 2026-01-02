@@ -1,0 +1,24 @@
+# Deployment (Friday v2)
+
+## What “deploy Friday” / “deploy yourself” means
+
+Deploy the current Friday v2 repo to the canonical v2 environment:
+
+- public URL: `https://friday2.edgflix.com`
+- host: Mac mini (gateway)
+
+## Current runtime (high-signal)
+
+- Process manager: macOS LaunchAgent `com.friday.v2`
+- Local port: `3334`
+- Reverse proxy: nginx on the Mac mini proxies `friday2.edgflix.com` → `http://127.0.0.1:3334`
+
+## Standard deploy steps (conceptual)
+
+1) Ensure local changes are committed + pushed to GitHub.
+2) On the Mac mini: pull latest in `/Users/ollie/workspace/friday-v2`.
+3) Restart the LaunchAgent.
+4) Verify `GET https://friday2.edgflix.com/api/health` returns `{ "ok": true }`.
+
+If nginx config changed, reload nginx (as the automation sudo user).
+
