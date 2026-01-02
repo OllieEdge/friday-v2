@@ -79,6 +79,14 @@ function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
       },
     });
 
+    tasks.setCancel(task, () => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // ignore
+      }
+    });
+
     child.on("close", async (code) => {
       const ok = code === 0;
       try {
@@ -113,4 +121,3 @@ function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
 }
 
 module.exports = { registerCodexAccounts };
-

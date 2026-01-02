@@ -7,6 +7,13 @@ function registerTasks(router, { tasks }) {
     return sendJson(res, 200, { ok: true, task: { id: task.id, kind: task.kind, status: task.status } });
   });
 
+  router.add("POST", "/api/tasks/:taskId/cancel", (_req, res, _url, params) => {
+    const task = tasks.get(params.taskId);
+    if (!task) return sendJson(res, 404, { ok: false, error: "not_found" });
+    const canceled = tasks.cancel(task);
+    return sendJson(res, 200, { ok: true, canceled });
+  });
+
   router.add("GET", "/api/tasks/:taskId/events", (req, res, _url, params) => {
     const task = tasks.get(params.taskId);
     if (!task) return sendJson(res, 404, { ok: false, error: "not_found" });
@@ -16,4 +23,3 @@ function registerTasks(router, { tasks }) {
 }
 
 module.exports = { registerTasks };
-
