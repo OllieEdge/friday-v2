@@ -36,3 +36,9 @@ Notes:
 - The tool refreshes an access token from the stored refresh token each run.
 - The tool reads `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from the root `.env` (or environment).
 
+Operational defaults (assistant behaviour):
+- Don’t ask whether Google is connected up front; try the call and only ask if auth fails.
+- For “check inbox” style requests, default to `48h + unread` and summarise before drilling into any single thread.
+- For “what was that email about?” / “more detail on that email” requests, drill down immediately:
+  - Search narrowly (recent/unread + subject/sender cues from the chat if present), then fetch the best match with `format=full`.
+  - Only ask a clarifying question if there are multiple credible matches after fetching top candidates’ `metadata` + `snippet`.
