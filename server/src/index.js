@@ -15,12 +15,14 @@ const { createTaskStore } = require("./lib/tasks");
 const { createChatsQueries } = require("./db/queries/chats");
 const { createSettingsQueries } = require("./db/queries/settings");
 const { createCodexProfilesQueries } = require("./db/queries/codex-profiles");
+const { createGoogleAccountsQueries } = require("./db/queries/google-accounts");
 
 const { registerHealth } = require("./routes/health");
 const { registerContext } = require("./routes/context");
 const { registerChats } = require("./routes/chats");
 const { registerTasks } = require("./routes/tasks");
 const { registerCodexAccounts } = require("./routes/accounts-codex");
+const { registerGoogleAccounts } = require("./routes/accounts-google");
 const { runAssistant } = require("./lib/runner");
 
 loadRootEnv();
@@ -32,6 +34,7 @@ importLegacyChatsIfEmpty(db);
 const chats = createChatsQueries(db);
 const settings = createSettingsQueries(db);
 const codexProfiles = createCodexProfilesQueries(db);
+const googleAccounts = createGoogleAccountsQueries(db);
 const tasks = createTaskStore();
 
 function loadContext() {
@@ -65,11 +68,12 @@ registerChats(router, {
 });
 registerTasks(router, { tasks });
 registerCodexAccounts(router, { db, codexProfiles, settings, tasks });
+registerGoogleAccounts(router, { googleAccounts });
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   try {
-    if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/oauth/")) {
       const handled = await router.handle(req, res, url);
       if (handled !== false) return;
       return sendJson(res, 404, { ok: false, error: "not_found" });

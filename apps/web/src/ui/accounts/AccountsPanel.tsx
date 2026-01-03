@@ -1,7 +1,7 @@
 import { Check, Copy, KeyRound, LogOut, Trash2, UserPlus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { api } from "../../api/client";
-import type { CodexAccountsResponse, ContextMetrics, TaskEvent } from "../../api/types";
+import type { CodexAccountsResponse, ContextMetrics, GoogleAccountsResponse, TaskEvent } from "../../api/types";
 
 type CreateProfileResponse = { ok: true; profileId: string };
 type ActivateResponse = { ok: true };
@@ -15,6 +15,9 @@ type UpdatePrefsResponse = {
     reasoningEffort: "" | "none" | "low" | "medium" | "high";
   };
 };
+
+type GoogleStartResponse = { ok: true; authUrl: string };
+type GoogleDisconnectResponse = { ok: true };
 
 function useTaskStream(taskId: string | null) {
   const [events, setEvents] = useState<TaskEvent[]>([]);
@@ -52,6 +55,7 @@ export function AccountsPanel({
   const [newLabel, setNewLabel] = useState("");
   const [loginTaskId, setLoginTaskId] = useState<string | null>(null);
   const { device, events, done } = useTaskStream(loginTaskId);
+  const [googleAccounts, setGoogleAccounts] = useState<GoogleAccountsResponse | null>(null);
 
   const activeId = accounts?.activeProfileId ?? null;
   const [sandboxMode, setSandboxMode] = useState<UpdatePrefsResponse["runner"]["sandboxMode"]>("read-only");
@@ -62,6 +66,15 @@ export function AccountsPanel({
     setSandboxMode(accounts.runner.sandboxMode);
     setReasoningEffort(accounts.runner.reasoningEffort);
   }, [accounts?.runner?.sandboxMode, accounts?.runner?.reasoningEffort]);
+
+  async function refreshGoogle() {
+    const res = await api<GoogleAccountsResponse>("/api/accounts/google");
+    setGoogleAccounts(res);
+  }
+
+  React.useEffect(() => {
+    void refreshGoogle();
+  }, []);
 
   const active = useMemo(() => {
     if (!activeId) return null;
@@ -117,6 +130,19 @@ export function AccountsPanel({
       body: JSON.stringify({ sandboxMode, reasoningEffort }),
     });
     await refreshAccounts();
+  }
+
+  async function connectGoogle(accountKey: "work" | "personal") {
+    const res = await api<GoogleStartResponse>(`/api/accounts/google/${accountKey}/connect/start`, {
+      method: "POST",
+      body: JSON.stringify({ returnTo: "/" }),
+    });
+    window.location.href = res.authUrl;
+  }
+
+  async function disconnectGoogle(accountKey: "work" | "personal") {
+    await api<GoogleDisconnectResponse>(`/api/accounts/google/${accountKey}/disconnect`, { method: "POST", body: "{}" });
+    await refreshGoogle();
   }
 
   return (
@@ -177,6 +203,44 @@ export function AccountsPanel({
           </button>
         </div>
         <div className="muted">These persist in Friday and apply to new messages.</div>
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ fontWeight: 700 }}>Google</div>
+        <div className="muted">Connect work and personal Google accounts. Tokens are stored server-side.</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {(googleAccounts?.accounts || [
+            { accountKey: "work" as const, connected: false },
+            { accountKey: "personal" as const, connected: false },
+          ]).map((ga) => (
+            <div key={ga.accountKey} className="row">
+              <div style={{ display: "grid", gap: 2 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ fontWeight: 700 }}>{ga.accountKey}</div>
+                  {ga.connected ? <span className="pill pillActive">connected</span> : <span className="pill">not connected</span>}
+                  {ga.connected && ga.email ? <span className="pill">{ga.email}</span> : null}
+                </div>
+                {ga.connected && ga.scopes ? <div className="muted">{ga.scopes}</div> : null}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {ga.connected ? (
+                  <button className="btn" onClick={() => disconnectGoogle(ga.accountKey)}>
+                    Disconnect
+                  </button>
+                ) : (
+                  <button className="btn secondary" onClick={() => connectGoogle(ga.accountKey)}>
+                    Connect
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="row" style={{ justifyContent: "flex-start" }}>
+          <button className="btn" onClick={() => refreshGoogle()}>
+            Refresh Google status
+          </button>
+        </div>
       </div>
 
       <div className="row">
@@ -268,4 +332,3 @@ export function AccountsPanel({
     </div>
   );
 }
-

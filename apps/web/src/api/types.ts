@@ -63,3 +63,17 @@ export type ContextMetrics = {
   bytes: number;
   approxTokens: number;
 };
+
+export type GoogleAccount = {
+  accountKey: "work" | "personal";
+  connected: boolean;
+  email?: string;
+  scopes?: string;
+  connectedAt?: string;
+  updatedAt?: string;
+};
+
+export type GoogleAccountsResponse = {
+  ok: true;
+  accounts: GoogleAccount[];
+};

@@ -167,6 +167,18 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const url = new URL(window.location.href);
+    const settings = url.searchParams.get("settings");
+    if (settings === "accounts" || settings === "settings") {
+      setSettingsOpen(true);
+      url.searchParams.delete("settings");
+      url.searchParams.delete("google");
+      url.searchParams.delete("key");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
+  useEffect(() => {
     if (chats.length === 0) return;
     if (!activeChatId) {
       void loadChat(chats[0].id);
