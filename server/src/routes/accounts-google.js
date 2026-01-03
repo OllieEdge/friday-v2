@@ -4,15 +4,12 @@ const { baseUrlFromReq, buildAuthUrl, buildRedirectUri, decodeState, encodeState
 
 const ALLOWED_KEYS = new Set(["work", "personal"]);
 
-function requireAdmin(req) {
-  const token = String(process.env.FRIDAY_ADMIN_TOKEN || "").trim();
-  if (!token) return;
-  const got = String(req.headers["x-friday-admin-token"] || "").trim();
-  if (got !== token) {
-    const err = new Error("forbidden");
-    err.statusCode = 403;
-    throw err;
-  }
+function safeReturnTo(value) {
+  const v = String(value || "").trim();
+  if (!v) return "/";
+  if (!v.startsWith("/")) return "/";
+  if (v.startsWith("//")) return "/";
+  return v;
 }
 
 function keyOrThrow(raw) {
@@ -27,7 +24,6 @@ function keyOrThrow(raw) {
 
 function registerGoogleAccounts(router, { googleAccounts }) {
   router.add("GET", "/api/accounts/google", (req, res) => {
-    requireAdmin(req);
     const rows = googleAccounts.list();
     const byKey = new Map(rows.map((r) => [r.accountKey, r]));
     const keys = ["work", "personal"];
@@ -41,11 +37,10 @@ function registerGoogleAccounts(router, { googleAccounts }) {
   });
 
   router.add("POST", "/api/accounts/google/:accountKey/connect/start", async (req, res, _url, params) => {
-    requireAdmin(req);
     const accountKey = keyOrThrow(params.accountKey);
     const cfg = requireGoogleConfig();
     const body = await readJson(req);
-    const returnTo = String(body?.returnTo || "/").trim() || "/";
+    const returnTo = safeReturnTo(body?.returnTo);
 
     const redirectUri = buildRedirectUri(req);
     const nonce = newNonce();
@@ -57,14 +52,12 @@ function registerGoogleAccounts(router, { googleAccounts }) {
   });
 
   router.add("POST", "/api/accounts/google/:accountKey/disconnect", (req, res, _url, params) => {
-    requireAdmin(req);
     const accountKey = keyOrThrow(params.accountKey);
     googleAccounts.remove(accountKey);
     return sendJson(res, 200, { ok: true });
   });
 
   router.add("GET", "/oauth/google/callback", async (req, res, url) => {
-    requireAdmin(req);
     const code = String(url.searchParams.get("code") || "");
     const stateStr = String(url.searchParams.get("state") || "");
     if (!code || !stateStr) return sendJson(res, 400, { ok: false, error: "missing_code_or_state" });
@@ -77,10 +70,11 @@ function registerGoogleAccounts(router, { googleAccounts }) {
     }
     const nonce = String(decoded?.nonce || "");
     const accountKey = keyOrThrow(decoded?.accountKey);
-    const returnTo = String(decoded?.returnTo || "/").trim() || "/";
+    const returnTo = safeReturnTo(decoded?.returnTo);
 
     const stateRow = googleAccounts.consumeState(nonce);
     if (!stateRow) return sendJson(res, 400, { ok: false, error: "invalid_state" });
+    if (stateRow.accountKey !== accountKey) return sendJson(res, 400, { ok: false, error: "invalid_state" });
 
     const cfg = requireGoogleConfig();
     const tokens = await exchangeCodeForTokens({
@@ -117,4 +111,3 @@ function registerGoogleAccounts(router, { googleAccounts }) {
 }
 
 module.exports = { registerGoogleAccounts };
-
