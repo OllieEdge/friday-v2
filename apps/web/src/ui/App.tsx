@@ -45,6 +45,8 @@ export function App() {
   const [sending, setSending] = useState(false);
   const taskStreamsRef = useRef<Map<string, EventSource>>(new Map());
   const seenEventsRef = useRef<Map<string, Set<string>>>(new Map());
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const lastChatIdRef = useRef<string | null>(null);
 
   const activeAccountLabel = useMemo(() => {
     if (!accounts?.activeProfileId) return "No active account";
@@ -160,6 +162,14 @@ export function App() {
     if (es) es.close();
     taskStreamsRef.current.delete(taskId);
     seenEventsRef.current.delete(taskId);
+  }
+
+  function scrollMessagesToBottom(force = false) {
+    const el = messagesRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (!force && distance > 120) return;
+    el.scrollTop = el.scrollHeight;
   }
 
   function appendTaskEvent({ taskId, messageId, event }: { taskId: string; messageId: string; event: any }) {
@@ -346,6 +356,19 @@ export function App() {
     for (const r of running) void attachTaskStream(r);
   }, [activeChat]);
 
+  useEffect(() => {
+    if (!activeChatId) return;
+    if (lastChatIdRef.current !== activeChatId) {
+      lastChatIdRef.current = activeChatId;
+      requestAnimationFrame(() => scrollMessagesToBottom(true));
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
+    if (!activeChatId) return;
+    requestAnimationFrame(() => scrollMessagesToBottom(false));
+  }, [activeChatId, activeChat?.messages?.length]);
+
   const contextText = useMemo(() => {
     if (!context) return "";
     return context.items.map((i) => `# ${i.filename}\n\n${i.content.trim()}\n`).join("\n\n---\n\n");
@@ -503,7 +526,7 @@ export function App() {
               <pre className="contextBody">{contextText}</pre>
             </section>
 
-            <section className="messages">
+            <section className="messages" ref={messagesRef}>
               {(activeChat?.messages || []).map((m) => (
                 <MessageBubble key={m.id} message={m} />
               ))}
