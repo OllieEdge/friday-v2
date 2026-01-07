@@ -24,12 +24,23 @@ test.describe("chat ui", () => {
     ]);
   }
 
+  function apiUrl(path: string) {
+    return new URL(path, baseURL).toString();
+  }
+
+  async function createChat(request: any, title: string) {
+    const res = await request.post(apiUrl("/api/chats"), { data: { title }, headers: authHeaders() });
+    const status = res.status();
+    const json = await res.json().catch(() => ({}));
+    expect(status).toBe(201);
+    const chatId = json?.chat?.id as string;
+    expect(chatId).toBeTruthy();
+    return chatId;
+  }
+
   test("composer stays visible on desktop", async ({ page, request }) => {
     const title = `e2e chat ${Date.now()}`;
-    const chatRes = await request.post("/api/chats", { data: { title }, headers: authHeaders() });
-    const chatJson = await chatRes.json();
-    const chatId = chatJson?.chat?.id as string;
-    expect(chatId).toBeTruthy();
+    await createChat(request, title);
 
     await authedPage(page);
     await page.goto(baseURL);
@@ -49,10 +60,7 @@ test.describe("chat ui", () => {
 
   test("chat loads scrolled to bottom", async ({ page, request }) => {
     const title = `e2e scroll ${Date.now()}`;
-    const chatRes = await request.post("/api/chats", { data: { title }, headers: authHeaders() });
-    const chatJson = await chatRes.json();
-    const chatId = chatJson?.chat?.id as string;
-    expect(chatId).toBeTruthy();
+    await createChat(request, title);
 
     await authedPage(page);
     await page.goto(baseURL);
