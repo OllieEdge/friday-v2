@@ -1,7 +1,7 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const { spawn } = require("node:child_process");
-const { envString } = require("../config/env");
+const { envNumber, envString } = require("../config/env");
 const { exchangeRefreshTokenForAccessToken, requireGoogleConfig } = require("./google");
 
 function normalizeString(value) {
@@ -331,7 +331,7 @@ async function vertexGenerateText({
   model,
   prompt,
   temperature = 0.2,
-  maxOutputTokens = 1024,
+  maxOutputTokens,
   cachedContent,
   authMode,
   googleAccounts,
@@ -349,11 +349,15 @@ async function vertexGenerateText({
     `https://${resolvedLocation}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(resolvedProjectId)}` +
     `/locations/${encodeURIComponent(resolvedLocation)}/publishers/google/models/${encodeURIComponent(resolvedModel)}:generateContent`;
 
+  const resolvedMaxOutputTokens = Number.isFinite(Number(maxOutputTokens))
+    ? Number(maxOutputTokens)
+    : envNumber("VERTEX_MAX_OUTPUT_TOKENS", 1024);
+
   const payload = {
     contents: [{ role: "user", parts: [{ text: normalizeString(prompt) }] }],
     generationConfig: {
       temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : 0.2,
-      maxOutputTokens: Math.max(64, Math.min(8192, Number(maxOutputTokens) || 1024)),
+      maxOutputTokens: Math.max(64, Math.min(65536, resolvedMaxOutputTokens || 1024)),
     },
   };
   const cached = normalizeString(cachedContent);

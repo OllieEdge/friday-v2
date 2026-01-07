@@ -46,6 +46,12 @@ context bundle on the Vertex side and reduce repeated prompt tokens:
 - `VERTEX_CONTEXT_CACHE=1`
 - optional: `VERTEX_CONTEXT_CACHE_TTL_S=3600` (min 60, max 86400)
 
+## Output length (optional)
+
+Vertex output is limited by `maxOutputTokens`. By default Friday v2 uses 1024 output tokens; to allow longer responses:
+
+- `VERTEX_MAX_OUTPUT_TOKENS=8192` (max 65536, model permitting)
+
 ## Operational notes
 
 - Uses Vertex `:generateContent` and runs inside `friday-server`/`friday-worker`.
