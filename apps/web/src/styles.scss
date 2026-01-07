@@ -176,6 +176,8 @@ textarea {
   border-bottom: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.12);
   padding: 10px 16px;
+  max-height: min(40vh, 420px);
+  overflow: auto;
 
   &.hidden {
     display: none;
