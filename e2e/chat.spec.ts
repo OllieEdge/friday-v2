@@ -71,6 +71,7 @@ test.describe("chat ui", () => {
         bubble.innerHTML = `<div class=\"msgRoleRow\"><div class=\"msgRole\">${i % 2 === 0 ? "assistant" : "user"}</div></div><div class=\"msgContent\"><div class=\"md\">Seed message ${i + 1}</div></div>`;
         el.appendChild(bubble);
       }
+      el.scrollTop = el.scrollHeight;
       return el.scrollHeight - el.scrollTop - el.clientHeight;
     });
 
