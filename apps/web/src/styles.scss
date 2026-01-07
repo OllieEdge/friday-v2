@@ -55,6 +55,8 @@ textarea {
   display: flex;
   flex-direction: column;
   min-width: 280px;
+  min-height: 0;
+  height: 100%;
 }
 
 .sidebarHeader {
@@ -75,6 +77,8 @@ textarea {
   overflow: auto;
   display: grid;
   gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .chatItem {
