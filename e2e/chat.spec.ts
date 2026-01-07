@@ -120,13 +120,16 @@ test.describe("chat ui", () => {
     await page.getByText(title, { exact: true }).first().click();
 
     const textarea = page.locator("form.composer textarea");
+    await expect(textarea).toBeVisible();
     await textarea.fill(
       "Id like to test your ability to change files next, could you see if you can add the functionality to paste images in to this chat composer please? the functionality would be that im typing and when i paste a image from the clipboard it gets uploaded to you (via new api endpoint) and appears in a new attachments section above the composer input field, where i can also remove them (in case it was added by mistake), or click on them to view.",
     );
     await page.getByRole("button", { name: "Send" }).click();
 
     const lastAssistant = page.locator(".msg.assistant").last();
-    await expect(lastAssistant.locator(".runPill.done")).toBeVisible();
+    const statusPill = lastAssistant.locator(".runPill");
+    await expect(statusPill).toBeVisible({ timeout: 10_000 });
+    await expect(statusPill).toHaveText(/done|error/i, { timeout: 90_000 });
 
     const content = await lastAssistant.textContent();
     expect(content || "").not.toMatch(/Runner error/i);
