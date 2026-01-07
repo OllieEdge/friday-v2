@@ -52,6 +52,14 @@ Vertex output is limited by `maxOutputTokens`. By default Friday v2 uses 1024 ou
 
 - `VERTEX_MAX_OUTPUT_TOKENS=8192` (max 65536, model permitting)
 
+## Code execution (optional)
+
+Gemini can run code via Vertex’s Code Execution tool. To enable it:
+
+- `VERTEX_CODE_EXECUTION=1`
+
+This executes in Google’s managed environment (no access to this machine’s filesystem).
+
 ## Operational notes
 
 - Uses Vertex `:generateContent` and runs inside `friday-server`/`friday-worker`.

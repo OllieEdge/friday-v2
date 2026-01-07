@@ -29,6 +29,11 @@ function safeGoogleAccountKey(value) {
   return GOOGLE_ACCOUNT_KEYS.has(v) ? v : "work";
 }
 
+function isTruthy(value) {
+  const v = String(value || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 function readAssistantRunnerPrefs({ settings }) {
   const vertexProjectId = envString("VERTEX_PROJECT_ID", "tmg-product-innovation-prod");
   const vertexLocation = envString("VERTEX_LOCATION", "europe-west2");
@@ -59,7 +64,10 @@ function registerRunnerSettings(router, { settings }) {
   router.add("GET", "/api/settings/runner", async (_req, res) => {
     const prefs = readAssistantRunnerPrefs({ settings });
     const effective = resolveEffectiveRunner({ settings });
-    return sendJson(res, 200, { ok: true, prefs, effective, env: { FRIDAY_RUNNER: envString("FRIDAY_RUNNER", "") || null } });
+    const caps = {
+      vertexCodeExecution: isTruthy(envString("VERTEX_CODE_EXECUTION", "")),
+    };
+    return sendJson(res, 200, { ok: true, prefs, effective, env: { FRIDAY_RUNNER: envString("FRIDAY_RUNNER", "") || null }, caps });
   });
 
   router.add("POST", "/api/settings/runner", async (req, res) => {

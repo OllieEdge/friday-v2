@@ -241,6 +241,29 @@ function normalizeBoolean(value) {
   return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 
+function normalizeOutputParts(parts) {
+  if (!Array.isArray(parts)) return "";
+  const chunks = [];
+  for (const p of parts) {
+    const text = normalizeString(p?.text);
+    if (text) {
+      chunks.push(text);
+      continue;
+    }
+    const execCode = normalizeString(p?.executableCode?.code);
+    if (execCode) {
+      const lang = normalizeString(p?.executableCode?.language) || "python";
+      chunks.push("```" + lang + "\n" + execCode + "\n```");
+      continue;
+    }
+    const execOut = normalizeString(p?.codeExecutionResult?.output);
+    if (execOut) {
+      chunks.push("```text\n" + execOut + "\n```");
+    }
+  }
+  return chunks.filter(Boolean).join("\n\n").trim();
+}
+
 function resolveCacheTtlSeconds() {
   const raw = Number(envString("VERTEX_CONTEXT_CACHE_TTL_S", ""));
   if (Number.isFinite(raw) && raw > 0) return Math.min(86_400, Math.max(60, Math.floor(raw)));
@@ -356,6 +379,7 @@ async function vertexGenerateText({
   const resolvedMaxOutputTokens = Number.isFinite(Number(maxOutputTokens))
     ? Number(maxOutputTokens)
     : envNumber("VERTEX_MAX_OUTPUT_TOKENS", 1024);
+  const enableCodeExecution = normalizeBoolean(envString("VERTEX_CODE_EXECUTION", ""));
 
   const payload = {
     contents: [{ role: "user", parts: [{ text: normalizeString(prompt) }] }],
@@ -364,6 +388,7 @@ async function vertexGenerateText({
       maxOutputTokens: Math.max(64, Math.min(65536, resolvedMaxOutputTokens || 1024)),
     },
   };
+  if (enableCodeExecution) payload.tools = [{ codeExecution: {} }];
   const cached = normalizeString(cachedContent);
   if (cached) payload.cachedContent = cached;
 
@@ -383,7 +408,7 @@ async function vertexGenerateText({
   if (!res.ok) throw new Error(json?.error?.message || json?.message || text || `HTTP ${res.status}`);
 
   const parts = json?.candidates?.[0]?.content?.parts;
-  const out = Array.isArray(parts) ? parts.map((p) => normalizeString(p?.text)).filter(Boolean).join("\n") : "";
+  const out = normalizeOutputParts(parts);
   const usage = json?.usageMetadata
     ? {
         inputTokens: Number(json.usageMetadata.promptTokenCount) || 0,
