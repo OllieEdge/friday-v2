@@ -1,7 +1,16 @@
 import { LayoutList, Menu, MessageSquare, Plus, Settings2, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import type { AuthStatusResponse, Chat, ChatSummary, CodexAccountsResponse, ContextBundle, ContextMetrics, Message } from "../api/types";
+import type {
+  AuthStatusResponse,
+  Chat,
+  ChatSummary,
+  CodexAccountsResponse,
+  ContextBundle,
+  ContextMetrics,
+  Message,
+  RunnerSettingsResponse,
+} from "../api/types";
 import { AuthOverlay } from "./AuthOverlay";
 import { MessageBubble } from "./MessageBubble";
 import { SettingsPage } from "./SettingsPage";
@@ -32,6 +41,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [accounts, setAccounts] = useState<CodexAccountsResponse | null>(null);
+  const [runnerSettings, setRunnerSettings] = useState<RunnerSettingsResponse | null>(null);
   const [sending, setSending] = useState(false);
   const taskStreamsRef = useRef<Map<string, EventSource>>(new Map());
   const seenEventsRef = useRef<Map<string, Set<string>>>(new Map());
@@ -131,6 +141,15 @@ export function App() {
     try {
       const res = await api<CodexAccountsResponse>("/api/accounts/codex");
       setAccounts(res);
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+    }
+  }
+
+  async function refreshRunnerSettings() {
+    try {
+      const res = await api<RunnerSettingsResponse>("/api/settings/runner");
+      setRunnerSettings(res);
     } catch (e: any) {
       if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
     }
@@ -287,6 +306,7 @@ export function App() {
       if (!st.authenticated && !st.hasAnyUsers) return;
       await refreshChats();
       await refreshAccounts();
+      await refreshRunnerSettings();
       await refreshContextMetrics();
     })();
   }, []);
@@ -330,6 +350,50 @@ export function App() {
     if (!context) return "";
     return context.items.map((i) => `# ${i.filename}\n\n${i.content.trim()}\n`).join("\n\n---\n\n");
   }, [context]);
+
+  const runnerMeta = useMemo(() => {
+    if (!runnerSettings) return "";
+    const runner = runnerSettings.effective?.runner || runnerSettings.prefs.runner || "unknown";
+    const parts: string[] = [`Runner: ${runner}`];
+    if (runner === "vertex") {
+      const model = runnerSettings.prefs.vertex.model || "default";
+      const location = runnerSettings.prefs.vertex.location || "";
+      parts.push(`Model: ${model}`);
+      if (location) parts.push(`Location: ${location}`);
+      const contextWindow = model === "gemini-2.5-pro" ? 1048576 : 0;
+      if (contextWindow) parts.push(`Context window: ${contextWindow.toLocaleString()}`);
+    } else if (runner === "openai" || runner === "api" || runner === "metered") {
+      const model = runnerSettings.prefs.openai.model || "";
+      if (model) parts.push(`Model: ${model}`);
+    }
+    return parts.join(" · ");
+  }, [runnerSettings]);
+
+  const lastUsage = useMemo(() => {
+    const msgs = activeChat?.messages || [];
+    for (let i = msgs.length - 1; i >= 0; i -= 1) {
+      const msg = msgs[i];
+      if (msg?.role !== "assistant") continue;
+      const events = Array.isArray(msg.events) ? msg.events : [];
+      for (let j = events.length - 1; j >= 0; j -= 1) {
+        const ev = events[j];
+        if (ev?.type === "usage" && ev?.usage) return ev.usage;
+      }
+    }
+    return null;
+  }, [activeChat]);
+
+  const usageMeta = useMemo(() => {
+    if (!lastUsage) return "";
+    const inTok = Number(lastUsage.inputTokens) || 0;
+    const cachedTok = Number(lastUsage.cachedInputTokens) || 0;
+    const outTok = Number(lastUsage.outputTokens) || 0;
+    if (!inTok && !cachedTok && !outTok) return "";
+    const parts = [`Last run: in ${inTok.toLocaleString()}`];
+    if (cachedTok) parts.push(`cached ${cachedTok.toLocaleString()}`);
+    parts.push(`out ${outTok.toLocaleString()}`);
+    return parts.join(" · ");
+  }, [lastUsage]);
 
   return (
     <div className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" ? " triageMode" : ""}`}>
@@ -389,6 +453,12 @@ export function App() {
               {contextMetrics ? ` · Context ~${contextMetrics.approxTokens.toLocaleString()} tokens` : ""}
               {activeUsageLabel ? ` · ${activeUsageLabel}` : ""}
             </div>
+            {view === "chat" && (runnerMeta || usageMeta) ? (
+              <div className="chatMeta">
+                {runnerMeta}
+                {usageMeta ? ` · ${usageMeta}` : ""}
+              </div>
+            ) : null}
           </div>
           <div className="topbarRight">
             {view === "triage" ? (

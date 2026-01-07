@@ -30,6 +30,11 @@ No follow-up “do you consent?” questions.
 
 Only ask clarifying questions when there’s a real fork that materially changes results (e.g. *which* account when both are plausible, or *which* of multiple matching threads).
 
+## Execution location (Friday vs local)
+
+- Prefer using the **Friday v2 instance on the Mac mini** for Gmail requests, since connected accounts live there.
+- If the assistant is already running **on the Mac mini** or **inside Friday v2**, assume the account is connected and **do not preflight-check**; just attempt the request and handle auth failures per the rule below.
+
 ## Failure handling (ask only when it breaks)
 
 If a Google request fails due to auth (missing/expired token, invalid grant, etc.):

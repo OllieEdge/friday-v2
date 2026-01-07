@@ -39,7 +39,7 @@ function readAssistantRunnerPrefs({ settings }) {
       baseUrl: safeText(settings.get("openai_base_url")),
     },
     vertex: {
-      model: safeText(settings.get("vertex_model")),
+      model: safeText(settings.get("vertex_model") || envString("VERTEX_MODEL", "")),
       projectId: safeText(vertexProjectId),
       location: safeText(vertexLocation),
       authMode: safeVertexAuthMode(settings.get("vertex_auth_mode") || envString("VERTEX_AUTH_MODE", "")),
