@@ -385,9 +385,13 @@ export function App() {
       if (location) parts.push(`Location: ${location}`);
       const contextWindow = model === "gemini-2.5-pro" ? 1048576 : 0;
       if (contextWindow) parts.push(`Context window: ${contextWindow.toLocaleString()}`);
+      parts.push("Tools: text-only");
     } else if (runner === "openai" || runner === "api" || runner === "metered") {
       const model = runnerSettings.prefs.openai.model || "";
       if (model) parts.push(`Model: ${model}`);
+      parts.push("Tools: text-only");
+    } else if (runner === "codex") {
+      parts.push("Tools: enabled");
     }
     return parts.join(" · ");
   }, [runnerSettings]);
