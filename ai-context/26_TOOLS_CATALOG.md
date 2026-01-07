@@ -15,6 +15,7 @@ Friday v2 should treat these as canonical references when answering â€œhow do Iâ
 
 - Google HTTP wrapper: `tools/google/google_http_request.mjs` (refresh-token based, per `work|personal`)
 - Microsoft HTTP wrapper: `tools/microsoft/microsoft_http_request.mjs` (refresh-token based, per connected `accountKey`)
+- Wiz GraphQL wrapper: `tools/wiz/wiz_api_request.mjs` (uses `WIZ_CLIENT_ID`, `WIZ_CLIENT_SECRET`, `WIZ_API_ENDPOINT` from `friday-v2/.env`)
 - Triage helper: `tools/triage/triage.mjs`
   - list triage items
   - set status / set priority
