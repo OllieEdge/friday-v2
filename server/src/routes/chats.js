@@ -14,6 +14,17 @@ function recordProfileUsage({ codexProfiles, profileId, usage, costUsd }) {
   });
 }
 
+function hydrateMessagesWithRunEvents(chats, chat) {
+  if (!chat || !Array.isArray(chat.messages)) return chat;
+  const messages = chat.messages.map((m) => {
+    const run = m?.meta?.run;
+    if (!run) return m;
+    const events = chats.listMessageEvents({ messageId: m.id, limit: 400 });
+    return { ...m, events };
+  });
+  return { ...chat, messages };
+}
+
 function registerChats(router, { chats, runAssistant, loadContext, tasks, codexProfiles }) {
   router.add("GET", "/api/chats", (_req, res) => {
     const list = chats.listChats();
@@ -27,7 +38,15 @@ function registerChats(router, { chats, runAssistant, loadContext, tasks, codexP
   });
 
   router.add("GET", "/api/chats/:chatId", (_req, res, _url, params) => {
-    const chat = chats.getChat(params.chatId);
+    const chat = hydrateMessagesWithRunEvents(chats, chats.getChat(params.chatId));
+    if (!chat) return sendJson(res, 404, { ok: false, error: "not_found" });
+    return sendJson(res, 200, { ok: true, chat });
+  });
+
+  router.add("POST", "/api/chats/:chatId/visibility", async (req, res, _url, params) => {
+    const body = await readJson(req);
+    const hidden = Boolean(body?.hidden);
+    const chat = chats.setChatHidden({ chatId: params.chatId, hidden });
     if (!chat) return sendJson(res, 404, { ok: false, error: "not_found" });
     return sendJson(res, 200, { ok: true, chat });
   });
@@ -64,39 +83,17 @@ function registerChats(router, { chats, runAssistant, loadContext, tasks, codexP
       return sendJson(res, 400, { ok: false, error: "tasks_unavailable" });
     }
 
-    const task = tasks.create({ kind: "chat_run" });
+    const task = tasks.create({ kind: "chat_run", input: { chatId: params.chatId } });
+    const assistantMeta = { run: { taskId: task.id, status: "running", startedAt: new Date().toISOString() } };
+    const assistantMsg = chats.appendMessage({ chatId: params.chatId, role: "assistant", content: "Thinking…", meta: assistantMeta });
+    if (assistantMsg) {
+      tasks.updateInput({ taskId: task.id, input: { ...(task.input || {}), assistantMessageId: assistantMsg.id } });
+    }
+    tasks.emit(task, { type: "status", stage: "queued" });
+
     tasks.emit(task, { type: "user_message", message: userMsg });
-    sendJson(res, 200, { ok: true, taskId: task.id, userMessage: userMsg });
-
-    setImmediate(async () => {
-      try {
-        tasks.emit(task, { type: "status", stage: "loading_context" });
-        const context = loadContext();
-        tasks.emit(task, { type: "status", stage: "running" });
-
-        const chat = chats.getChat(params.chatId);
-        const result = await runAssistant({
-          context,
-          chat,
-          onEvent: (ev) => tasks.emit(task, ev),
-        });
-
-        const assistantContent = String(result?.content || "");
-        const assistantMsg = chats.appendMessage({ chatId: params.chatId, role: "assistant", content: assistantContent });
-        tasks.emit(task, { type: "assistant_message", message: assistantMsg });
-
-        const costUsd = result?.usage ? estimateCostUsd(result.usage) : null;
-        recordProfileUsage({ codexProfiles, profileId: result?.profileId, usage: result?.usage, costUsd });
-        if (result?.usage) tasks.emit(task, { type: "usage", usage: result.usage, costUsd });
-
-        tasks.finish(task, true, 0);
-      } catch (e) {
-        const msg = `Runner error: ${String(e?.message || e)}`;
-        const assistantMsg = chats.appendMessage({ chatId: params.chatId, role: "assistant", content: msg });
-        tasks.emit(task, { type: "assistant_message", message: assistantMsg });
-        tasks.finish(task, false, null);
-      }
-    });
+    if (assistantMsg) tasks.emit(task, { type: "assistant_placeholder", message: assistantMsg });
+    sendJson(res, 200, { ok: true, taskId: task.id, userMessage: userMsg, assistantMessage: assistantMsg });
   });
 }
 

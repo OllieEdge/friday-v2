@@ -14,7 +14,7 @@ Set these in `friday-v2/.env` on the host:
 - `FRIDAY_BASE_URL=https://friday2.edgflix.com`
 - `GOOGLE_CLIENT_ID=...`
 - `GOOGLE_CLIENT_SECRET=...`
-- `GOOGLE_SCOPES="openid email profile https://www.googleapis.com/auth/gmail.readonly"`
+- `GOOGLE_SCOPES="openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/chat.messages"`
 
 If scopes change, re-connect accounts.
 
@@ -26,4 +26,3 @@ In the UI: `Settings → Accounts → Google`:
 - Connect `personal`
 
 Tokens (refresh tokens) are stored server-side in SQLite and never printed intentionally.
-

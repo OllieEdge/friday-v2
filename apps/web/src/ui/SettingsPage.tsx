@@ -2,16 +2,20 @@ import { ChevronLeft, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import type { CodexAccountsResponse, ContextMetrics } from "../api/types";
 import { AccountsPanel } from "./accounts/AccountsPanel";
+import { ScheduledPanel } from "./runbooks/ScheduledPanel";
+import { SecurityPanel } from "./security/SecurityPanel";
 
-type Section = "accounts";
+type Section = "accounts" | "scheduled" | "security";
 
 export function SettingsPage({
   onClose,
+  onLoggedOut,
   accounts,
   refreshAccounts,
   contextMetrics,
 }: {
   onClose: () => void;
+  onLoggedOut: () => Promise<void>;
   accounts: CodexAccountsResponse | null;
   refreshAccounts: () => Promise<void>;
   contextMetrics: ContextMetrics | null;
@@ -20,6 +24,8 @@ export function SettingsPage({
 
   const title = useMemo(() => {
     if (section === "accounts") return "Accounts";
+    if (section === "scheduled") return "Scheduled";
+    if (section === "security") return "Security";
     return "Settings";
   }, [section]);
 
@@ -46,11 +52,27 @@ export function SettingsPage({
             >
               Accounts
             </button>
+            <button
+              className={`settingsNavItem${section === "scheduled" ? " active" : ""}`}
+              onClick={() => setSection("scheduled")}
+            >
+              Scheduled
+            </button>
+            <button
+              className={`settingsNavItem${section === "security" ? " active" : ""}`}
+              onClick={() => setSection("security")}
+            >
+              Security
+            </button>
           </nav>
 
           <div className="settingsContent">
             {section === "accounts" ? (
               <AccountsPanel accounts={accounts} refreshAccounts={refreshAccounts} contextMetrics={contextMetrics} />
+            ) : section === "scheduled" ? (
+              <ScheduledPanel />
+            ) : section === "security" ? (
+              <SecurityPanel onLoggedOut={onLoggedOut} />
             ) : null}
           </div>
         </div>
@@ -58,4 +80,3 @@ export function SettingsPage({
     </div>
   );
 }
-

@@ -24,7 +24,12 @@ body {
   background: radial-gradient(1200px 700px at 30% -20%, rgba(122, 162, 255, 0.25), transparent 60%),
     radial-gradient(900px 600px at 110% 10%, rgba(45, 212, 191, 0.18), transparent 55%),
     var(--bg);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
   color: var(--text);
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 button,
@@ -34,9 +39,13 @@ textarea {
 }
 
 .app {
-  height: 100%;
+  height: 100dvh;
   display: grid;
   grid-template-columns: 320px 1fr;
+}
+
+.app.triageMode {
+  grid-template-columns: 1fr;
 }
 
 .sidebar {
@@ -100,17 +109,28 @@ textarea {
 .main {
   display: grid;
   grid-template-rows: auto auto 1fr auto;
+  grid-template-areas:
+    "topbar"
+    "context"
+    "messages"
+    "composer";
   min-width: 0;
+  min-height: 0;
 }
 
 .topbar {
+  grid-area: topbar;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(15, 22, 34, 0.72);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .topbarLeft {
@@ -146,6 +166,7 @@ textarea {
 }
 
 .contextPanel {
+  grid-area: context;
   border-bottom: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.12);
   padding: 10px 16px;
@@ -170,10 +191,150 @@ textarea {
 }
 
 .messages {
+  grid-area: messages;
   padding: 18px 16px;
   overflow: auto;
   display: grid;
   gap: 12px;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.triageMain {
+  grid-area: messages;
+  padding: 12px 16px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.triageShell {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 12px;
+}
+
+.triageLists {
+  overflow: auto;
+  min-height: 0;
+  display: grid;
+  gap: 12px;
+  padding-right: 2px;
+}
+
+.triageList {
+  display: grid;
+  gap: 8px;
+}
+
+.triageItem {
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.14);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 10px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+
+  &:hover {
+    border-color: rgba(122, 162, 255, 0.35);
+  }
+
+  &.active {
+    border-color: rgba(122, 162, 255, 0.7);
+    box-shadow: 0 0 0 1px rgba(122, 162, 255, 0.25) inset;
+  }
+}
+
+.triageItemTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.triageItemTitle {
+  font-weight: 700;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.triageItemBadges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.pillConfidence {
+  border-color: rgba(122, 162, 255, 0.35);
+}
+
+.pillConfidenceHigh {
+  border-color: rgba(45, 212, 191, 0.55);
+  color: rgba(231, 238, 252, 0.95);
+}
+
+.pillConfidenceMed {
+  border-color: rgba(122, 162, 255, 0.55);
+  color: rgba(231, 238, 252, 0.95);
+}
+
+.pillConfidenceLow {
+  border-color: rgba(248, 113, 113, 0.65);
+  color: rgba(231, 238, 252, 0.95);
+}
+
+.triageFeedbackOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.triageFeedbackModal {
+  width: min(560px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.triageDetail {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.triageChat {
+  overflow: auto;
+  min-height: 220px;
+  max-height: 46vh;
+  display: grid;
+  gap: 12px;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.triageComposer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
 }
 
 .msg {
@@ -182,6 +343,8 @@ textarea {
   padding: 12px 12px;
   background: rgba(255, 255, 255, 0.03);
   max-width: 920px;
+  font-size: 14px;
+  line-height: 1.45;
 
   &.user {
     margin-left: auto;
@@ -197,37 +360,164 @@ textarea {
 .msgRole {
   font-size: 12px;
   color: var(--muted);
+  margin: 0;
+}
+
+.msgRoleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 6px;
 }
 
+.runPill {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--muted);
+
+  &.running {
+    border-color: rgba(122, 162, 255, 0.55);
+    color: rgba(231, 238, 252, 0.9);
+  }
+
+  &.done {
+    border-color: rgba(45, 212, 191, 0.55);
+    color: rgba(231, 238, 252, 0.9);
+  }
+
+  &.error {
+    border-color: rgba(248, 113, 113, 0.65);
+    color: rgba(231, 238, 252, 0.9);
+  }
+}
+
 .msgContent {
-  white-space: pre-wrap;
-  line-height: 1.45;
-  font-size: 14px;
+  white-space: normal;
+}
+
+.md {
+  font-size: inherit;
+  color: rgba(231, 238, 252, 0.96);
+
+  h1,
+  h2,
+  h3 {
+    margin: 0 0 10px 0;
+    line-height: 1.25;
+  }
+
+  h1 {
+    font-size: 1.25em;
+  }
+
+  h2 {
+    font-size: 1.15em;
+  }
+
+  h3 {
+    font-size: 1.08em;
+  }
+
+  p {
+    margin: 0 0 10px 0;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  ul,
+  ol {
+    margin: 8px 0 8px 18px;
+    padding: 0;
+  }
+
+  li {
+    margin: 4px 0;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.95em;
+    padding: 0.15em 0.35em;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.22);
+  }
+
+  pre {
+    margin: 10px 0;
+    padding: 10px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.22);
+    overflow: auto;
+    white-space: pre;
+    line-height: 1.35;
+    font-size: 12px;
+  }
+
+  pre code {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  blockquote {
+    margin: 10px 0;
+    padding: 8px 10px;
+    border-left: 3px solid rgba(122, 162, 255, 0.45);
+    color: rgba(231, 238, 252, 0.9);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+  }
+}
+
+.msgDetails {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.msgDetailsSummary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.msgDetailsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.msgDetailsBody {
+  margin-top: 8px;
+  display: grid;
+  gap: 10px;
 }
 
 .composer {
+  grid-area: composer;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
-}
-
-.runPanel {
-  border-top: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.1);
-  padding: 10px 16px;
-  display: grid;
-  gap: 8px;
-}
-
-.runHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .textarea {
@@ -376,6 +666,97 @@ textarea {
   z-index: 40;
 }
 
+.authOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.76);
+  z-index: 90;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.authCard {
+  width: min(420px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.authTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.authIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(122, 162, 255, 0.5);
+  background: rgba(122, 162, 255, 0.12);
+}
+
+.authTitle {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.authSubtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.authError {
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+  color: rgba(254, 202, 202, 0.95);
+  border-radius: 12px;
+  padding: 10px 10px;
+  font-size: 12px;
+}
+
+.authActions {
+  display: grid;
+  gap: 10px;
+}
+
+.authRegister {
+  display: grid;
+  gap: 10px;
+}
+
+.authDivider {
+  height: 1px;
+  background: var(--border);
+}
+
+.authHint {
+  font-weight: 700;
+}
+
+.authRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.authSmall {
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .settingsOverlay {
   position: fixed;
   inset: 0;
@@ -463,6 +844,40 @@ textarea {
   gap: 12px;
 }
 
+.settingsCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.settingsCardHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.settingsCardTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settingsDivider {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+  margin: 6px 0;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
 @media (max-width: 860px) {
   .app {
     grid-template-columns: 1fr;
@@ -488,6 +903,30 @@ textarea {
 
   .main {
     grid-template-rows: auto auto 1fr auto;
+  }
+
+  .triageMain {
+    padding: 10px 10px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .triageShell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: auto;
+  }
+
+  .triageLists {
+    overflow: visible;
+  }
+
+  .triageDetail {
+    overflow: visible;
+  }
+
+  .triageChat {
+    max-height: none;
   }
 
   .settingsOverlay {

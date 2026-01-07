@@ -1,37 +1,29 @@
 const { newId } = require("../utils/id");
 
-function createTaskStore() {
-  const tasks = new Map();
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-  function create({ kind }) {
-    const id = newId();
-    const task = {
-      id,
-      kind,
-      createdAt: new Date().toISOString(),
-      status: "running",
-      events: [],
-      clients: new Set(),
-      cancelFn: null,
-    };
-    tasks.set(id, task);
-    return task;
-  }
+function createTaskStore({ tasksDb }) {
+  const clientsByTaskId = new Map();
 
   function get(id) {
-    return tasks.get(id) || null;
+    return tasksDb.get(id);
   }
 
   function setCancel(task, fn) {
-    task.cancelFn = typeof fn === "function" ? fn : null;
+    // no-op for durable tasks; cancellation is DB-driven.
+    void task;
+    void fn;
   }
 
   function emit(task, event) {
-    task.events.push(event);
-    if (task.events.length > 500) task.events.splice(0, task.events.length - 500);
-    const payload = `data: ${JSON.stringify(event)}\n\n`;
-    for (const res of task.clients) {
-      res.write(payload);
+    tasksDb.appendEvent({ taskId: task.id, event });
+
+    const clients = clientsByTaskId.get(task.id);
+    if (clients?.size) {
+      const payload = `data: ${JSON.stringify(event)}\n\n`;
+      for (const res of clients) res.write(payload);
     }
   }
 
@@ -41,36 +33,71 @@ function createTaskStore() {
       "cache-control": "no-store",
       connection: "keep-alive",
     });
-    for (const e of task.events) {
-      res.write(`data: ${JSON.stringify(e)}\n\n`);
-    }
-    task.clients.add(res);
-    res.on("close", () => task.clients.delete(res));
+
+    let closed = false;
+    let lastEventId = 0;
+
+    const clients = clientsByTaskId.get(task.id) || new Set();
+    clients.add(res);
+    clientsByTaskId.set(task.id, clients);
+
+    res.on("close", () => {
+      closed = true;
+      clients.delete(res);
+      if (clients.size === 0) clientsByTaskId.delete(task.id);
+    });
+
+    (async () => {
+      try {
+        while (!closed) {
+          const events = tasksDb.listEvents({ taskId: task.id, afterId: lastEventId, limit: 500 });
+          for (const e of events) {
+            lastEventId = e.id;
+            res.write(`data: ${JSON.stringify(e.event)}\n\n`);
+          }
+          await sleep(500);
+        }
+      } catch {
+        // ignore; client likely disconnected
+      }
+    })();
   }
 
   function cancel(task, reason = "canceled") {
-    if (!task || task.status !== "running") return false;
-    task.status = "canceled";
-    emit(task, { type: "canceled", reason });
-    try {
-      if (task.cancelFn) task.cancelFn();
-    } catch {
-      // ignore
+    const current = tasksDb.get(task?.id);
+    if (!current || (current.status !== "queued" && current.status !== "running")) return false;
+    tasksDb.setStatus({ taskId: current.id, status: "canceled", completedAt: new Date().toISOString() });
+    tasksDb.appendEvent({ taskId: current.id, event: { type: "canceled", reason } });
+    const clients = clientsByTaskId.get(current.id);
+    if (clients?.size) {
+      for (const res of clients) res.end();
+      clientsByTaskId.delete(current.id);
     }
-    for (const res of task.clients) res.end();
-    task.clients.clear();
     return true;
   }
 
   function finish(task, ok, exitCode) {
-    if (!task || task.status !== "running") return;
-    task.status = ok ? "ok" : "error";
-    emit(task, { type: "done", ok, exitCode: exitCode ?? null });
-    for (const res of task.clients) res.end();
-    task.clients.clear();
+    const current = tasksDb.get(task?.id);
+    if (!current || current.status === "canceled") return;
+    const status = ok ? "ok" : "error";
+    tasksDb.setStatus({ taskId: current.id, status, completedAt: new Date().toISOString() });
+    tasksDb.appendEvent({ taskId: current.id, event: { type: "done", ok, exitCode: exitCode ?? null } });
+    const clients = clientsByTaskId.get(current.id);
+    if (clients?.size) {
+      for (const res of clients) res.end();
+      clientsByTaskId.delete(current.id);
+    }
   }
 
-  return { create, get, setCancel, emit, attachSse, cancel, finish };
+  function create({ kind, input, status }) {
+    return tasksDb.create({ kind, input, status });
+  }
+
+  function updateInput({ taskId, input }) {
+    return tasksDb.updateInput({ taskId, input });
+  }
+
+  return { create, get, updateInput, setCancel, emit, attachSse, cancel, finish };
 }
 
 module.exports = { createTaskStore };

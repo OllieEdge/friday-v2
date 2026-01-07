@@ -1,6 +1,7 @@
 const { readJson } = require("../http/body");
 const { sendJson, sendNoContent } = require("../http/respond");
 const { nowIso } = require("../utils/time");
+const { estimateCostUsd } = require("../lib/cost");
 const {
   resolveCodexPath,
   runCodexLoginStatus,
@@ -48,7 +49,15 @@ function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
       } catch (e) {
         statusText = `status_error: ${String(e?.message || e)}`;
       }
-      enriched.push({ ...p, loggedIn, authMode, statusText });
+      const estimatedTotalCostUsd =
+        authMode === "api_key"
+          ? estimateCostUsd({
+              inputTokens: p.totalInputTokens,
+              cachedInputTokens: p.totalCachedInputTokens,
+              outputTokens: p.totalOutputTokens,
+            })
+          : null;
+      enriched.push({ ...p, loggedIn, authMode, statusText, estimatedTotalCostUsd });
     }
 
     return sendJson(res, 200, {
@@ -97,7 +106,7 @@ function registerCodexAccounts(router, { db, codexProfiles, settings, tasks }) {
     if (!p) return sendJson(res, 404, { ok: false, error: "not_found" });
 
     const codexPath = resolveCodexPath();
-    const task = tasks.create({ kind: "codex_device_login" });
+    const task = tasks.create({ kind: "codex_device_login", status: "running" });
 
     const recent = [];
     const child = startDeviceLogin({

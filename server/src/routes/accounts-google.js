@@ -1,8 +1,9 @@
 const { readJson } = require("../http/body");
 const { sendJson } = require("../http/respond");
-const { baseUrlFromReq, buildAuthUrl, buildRedirectUri, decodeState, encodeState, newNonce, normalizeAccountKey, requireGoogleConfig, exchangeCodeForTokens, fetchUserInfo } = require("../lib/google");
+const { baseUrlFromReq, buildAuthUrl, buildRedirectUri, decodeState, encodeState, newNonce, normalizeAccountKey, requireGoogleConfig, resolveGoogleScopesForPurpose, exchangeCodeForTokens, fetchUserInfo } = require("../lib/google");
 
 const ALLOWED_KEYS = new Set(["work", "personal"]);
+const ALLOWED_PURPOSES = new Set(["default", "vertex"]);
 
 function safeReturnTo(value) {
   const v = String(value || "").trim();
@@ -20,6 +21,11 @@ function keyOrThrow(raw) {
     throw err;
   }
   return key;
+}
+
+function safePurpose(value) {
+  const v = String(value || "").trim().toLowerCase() || "default";
+  return ALLOWED_PURPOSES.has(v) ? v : "default";
 }
 
 function registerGoogleAccounts(router, { googleAccounts }) {
@@ -41,13 +47,15 @@ function registerGoogleAccounts(router, { googleAccounts }) {
     const cfg = requireGoogleConfig();
     const body = await readJson(req);
     const returnTo = safeReturnTo(body?.returnTo);
+    const purpose = safePurpose(body?.purpose);
+    const scopes = resolveGoogleScopesForPurpose({ baseScopes: cfg.scopes, purpose });
 
     const redirectUri = buildRedirectUri(req);
     const nonce = newNonce();
     googleAccounts.createState({ nonce, accountKey, redirectUri });
 
-    const state = encodeState({ nonce, accountKey, returnTo });
-    const authUrl = buildAuthUrl({ clientId: cfg.clientId, redirectUri, scopes: cfg.scopes, state });
+    const state = encodeState({ nonce, accountKey, returnTo, purpose });
+    const authUrl = buildAuthUrl({ clientId: cfg.clientId, redirectUri, scopes, state });
     return sendJson(res, 200, { ok: true, authUrl });
   });
 
@@ -71,6 +79,7 @@ function registerGoogleAccounts(router, { googleAccounts }) {
     const nonce = String(decoded?.nonce || "");
     const accountKey = keyOrThrow(decoded?.accountKey);
     const returnTo = safeReturnTo(decoded?.returnTo);
+    const purpose = safePurpose(decoded?.purpose);
 
     const stateRow = googleAccounts.consumeState(nonce);
     if (!stateRow) return sendJson(res, 400, { ok: false, error: "invalid_state" });
@@ -98,7 +107,9 @@ function registerGoogleAccounts(router, { googleAccounts }) {
     }
     if (!finalRefresh) return sendJson(res, 400, { ok: false, error: "missing_refresh_token" });
 
-    googleAccounts.upsert({ accountKey, email, refreshToken: finalRefresh, scopes: cfg.scopes });
+    const requestedScopes = resolveGoogleScopesForPurpose({ baseScopes: cfg.scopes, purpose });
+    const grantedScopes = String(tokens?.scope || "").trim() || requestedScopes;
+    googleAccounts.upsert({ accountKey, email, refreshToken: finalRefresh, scopes: grantedScopes });
 
     const origin = baseUrlFromReq(req).replace(/\/+$/, "");
     const target = new URL(returnTo, origin);

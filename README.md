@@ -1,4 +1,4 @@
-# Friday v2 (staging)
+# Friday v2
 
 Friday v2 is a context-first personal assistant UI: the product is mostly **documents + tooling** rather than application logic.
 
@@ -9,7 +9,7 @@ Friday v2 is a context-first personal assistant UI: the product is mostly **docu
   - shows loaded context,
   - (later) invokes a model/runner (e.g. Codex CLI) using that context.
 
-This folder is staged inside `telegraph` due to sandboxing; when ready, move it to its own repo.
+Deployed instance: `https://friday2.edgflix.com` (gateway nginx → `127.0.0.1:3334`, LaunchAgent `com.friday.v2`).
 
 ## Local dev
 
@@ -53,6 +53,26 @@ cp .env.example .env
 2) Set `FRIDAY_RUNNER=codex` and (if needed) `CODEX_PATH=...`.
 
 3) In the UI: Settings → Accounts → add an account → “Login with code” → set active.
+
+## Switch runners (recommended)
+
+Set `FRIDAY_RUNNER=settings` and use Settings → Accounts → Assistant runner to pick between:
+- Codex (seat)
+- OpenAI API (metered)
+- Google Gemini via Vertex
+
+## Connect Google (Gemini via Vertex)
+
+1) Set Vertex config in `.env`:
+- `VERTEX_PROJECT_ID=...`
+- optional: `VERTEX_LOCATION=europe-west2`, `VERTEX_MODEL=gemini-2.0-flash`
+
+2) Add auth in `.env` (choose one):
+- `VERTEX_SERVICE_ACCOUNT_FILE=/path/to/service-account.json` (recommended), or
+- `VERTEX_AWS_SECRET_ID=...` (service account JSON stored in AWS Secrets Manager), or
+- `VERTEX_ACCESS_TOKEN=...` (debug only)
+
+3) In the UI: Settings → Accounts → Assistant runner → “Google (Gemini via Vertex)”.
 
 ## Structure
 

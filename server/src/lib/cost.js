@@ -18,7 +18,9 @@ function estimateCostUsd({ inputTokens, cachedInputTokens, outputTokens }) {
   const cachedTok = Number(cachedInputTokens) || 0;
   const outTok = Number(outputTokens) || 0;
 
-  const costIn = (inRate == null ? 0 : (inTok / 1000) * inRate) + (cachedRate == null ? 0 : (cachedTok / 1000) * cachedRate);
+  const uncachedTok = Math.max(0, inTok - cachedTok);
+  const costIn =
+    (inRate == null ? 0 : (uncachedTok / 1000) * inRate) + (cachedRate == null ? 0 : (cachedTok / 1000) * cachedRate);
   const costOut = outRate == null ? 0 : (outTok / 1000) * outRate;
 
   const total = costIn + costOut;
@@ -26,4 +28,3 @@ function estimateCostUsd({ inputTokens, cachedInputTokens, outputTokens }) {
 }
 
 module.exports = { estimateCostUsd };
-

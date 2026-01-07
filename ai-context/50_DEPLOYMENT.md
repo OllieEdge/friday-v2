@@ -15,8 +15,8 @@ Deploy the current Friday v2 repo to the canonical v2 environment:
 
 ## Standard deploy steps (conceptual)
 
-1) Ensure local changes are committed + pushed to GitHub.
-2) On the Mac mini: pull latest in `/Users/ollie/workspace/friday-v2`.
+1) Ensure local changes are committed + pushed to GitHub (deploys should come from git, not rsync).
+2) On the Mac mini: `git pull` latest in `/Users/ollie/workspace/friday-v2`.
 3) Install deps + build UI:
    - `cd /Users/ollie/workspace/friday-v2 && npm install && npm run build`
 4) Restart the LaunchAgent.
@@ -28,8 +28,10 @@ If nginx config changed, reload nginx (as the automation sudo user).
 
 Friday v2 can run in a few modes depending on `.env`:
 
-- Seat-based (preferred): `FRIDAY_RUNNER=codex` (requires Codex CLI device login in Settings → Accounts).
+- UI-controlled (recommended): `FRIDAY_RUNNER=settings` then pick the runner in Settings → Accounts → Assistant runner.
+- Seat-based: `FRIDAY_RUNNER=codex` (requires Codex CLI device login in Settings → Accounts).
 - Metered fallback: `FRIDAY_RUNNER=openai` + `OPENAI_API_KEY=...` (uses the OpenAI API; pay-per-use).
+- Google (Gemini): `FRIDAY_RUNNER=vertex` (or select in UI) + Vertex auth/config in `.env`.
 
 Codex runner options:
 

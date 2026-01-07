@@ -85,14 +85,23 @@ function startDeviceLogin({ codexPath, codexHomePath, onLine }) {
   return child;
 }
 
-function buildPrompt({ contextText, chatMessages }) {
+function buildPrompt({ contextText, chatMessages }, { mode } = {}) {
+  const m = String(mode || "").trim().toLowerCase();
+  const policy =
+    m === "runbook"
+      ? "You are running a scheduled runbook/background job.\n" +
+        "- You MUST run any commands included in the runbook instructions (do not just describe them).\n" +
+        "- You may run shell commands as needed to query data.\n" +
+        "- Avoid side-effect actions unless the runbook explicitly asks (and sandbox may prevent writes).\n"
+      : "Do not run shell commands or modify files unless explicitly asked.\n";
+
   const sys =
     "You are Friday v2, Oliver’s personal assistant.\n" +
     "You must follow the context below (ordered, deterministic).\n" +
     "Be dry-witted but useful (FRIDAY-ish), and do not overpromise.\n" +
     "If the user asks for a state-changing action, treat it as explicit intent and explain what you will do.\n" +
-    "Do not run shell commands or modify files unless explicitly asked.\n\n" +
-    "Context:\n\n" +
+    policy +
+    "\nContext:\n\n" +
     contextText +
     "\n\n---\n\nConversation:\n";
 
@@ -134,6 +143,8 @@ async function runCodexExec({
     let lastText = "";
     let usage = null;
     let err = "";
+    let lastCodexError = "";
+    let nonJsonLines = [];
 
     const rl = readline.createInterface({ input: child.stdout });
     rl.on("line", (line) => {
@@ -145,6 +156,12 @@ async function runCodexExec({
         if (ev?.type === "item.completed" && ev?.item?.type === "agent_message") {
           lastText = String(ev?.item?.text || "");
         }
+        if (ev?.type === "error" && typeof ev?.message === "string" && ev.message.trim()) {
+          lastCodexError = ev.message.trim();
+        }
+        if (ev?.type === "turn.failed" && typeof ev?.error?.message === "string" && ev.error.message.trim()) {
+          lastCodexError = ev.error.message.trim();
+        }
         if (ev?.type === "turn.completed" && ev?.usage) {
           usage = {
             inputTokens: Number(ev.usage.input_tokens) || 0,
@@ -153,7 +170,9 @@ async function runCodexExec({
           };
         }
       } catch {
-        // ignore non-json lines
+        // Keep a short tail of non-JSON output for better error messages.
+        nonJsonLines.push(trimmed);
+        if (nonJsonLines.length > 20) nonJsonLines.splice(0, nonJsonLines.length - 20);
       }
     });
 
@@ -162,7 +181,12 @@ async function runCodexExec({
     child.on("error", (e) => reject(e));
     child.on("close", (code) => {
       rl.close();
-      if (code !== 0) return reject(new Error(stripAnsi(err).trim() || `codex exec failed (${code})`));
+      if (code !== 0) {
+        const stderr = stripAnsi(err).trim();
+        const stdoutTail = stripAnsi(nonJsonLines.join("\n")).trim();
+        const msg = stderr || lastCodexError || stdoutTail || `codex exec failed (${code})`;
+        return reject(new Error(msg));
+      }
       return resolve({ content: String(lastText || "").trim(), usage });
     });
 

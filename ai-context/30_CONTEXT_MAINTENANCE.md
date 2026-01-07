@@ -10,6 +10,7 @@ Update or propose updates when:
 - a workflow changes (ports/domains, new LaunchAgent labels),
 - a safety rule is clarified (e.g. what counts as a “write” action),
 - a new tool/script becomes the preferred way to do something.
+- deployment practice changes (e.g. “deploy via git pull, not rsync”).
 
 ## How to update safely
 
@@ -18,6 +19,7 @@ Rules:
 - Never write secrets into context (tokens, keys, session cookies).
 - Keep changes high-signal; avoid duplicating obvious code.
 - Prefer *adding* a small focused file over bloating one doc.
+- For deploy/runbooks, prefer “commit + push → pull on gateway → restart” so the deployed state matches Git history.
 
 Workflow:
 
@@ -27,4 +29,3 @@ Workflow:
 4) Say what changed and why (short).
 
 If the user explicitly asks “update your context” (or equivalent), proceed with the workflow above.
-

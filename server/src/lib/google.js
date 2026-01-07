@@ -10,12 +10,38 @@ function normalizeAccountKey(key) {
   return v;
 }
 
+function normalizeScopes(scopes) {
+  const raw = String(scopes || "").trim();
+  if (!raw) return [];
+  return raw.split(/\s+/).map((s) => s.trim()).filter(Boolean);
+}
+
+function mergeScopes(baseScopes, extraScopes) {
+  const out = [];
+  const seen = new Set();
+  for (const s of [...normalizeScopes(baseScopes), ...normalizeScopes(extraScopes)]) {
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out.join(" ").trim();
+}
+
+function resolveGoogleScopesForPurpose({ baseScopes, purpose }) {
+  const p = String(purpose || "").trim().toLowerCase();
+  if (!p || p === "default") return String(baseScopes || "").trim();
+  if (p === "vertex") {
+    return mergeScopes(baseScopes, "https://www.googleapis.com/auth/cloud-platform");
+  }
+  return String(baseScopes || "").trim();
+}
+
 function requireGoogleConfig() {
   const clientId = envString("GOOGLE_CLIENT_ID", "");
   const clientSecret = envString("GOOGLE_CLIENT_SECRET", "");
   const scopes = envString(
     "GOOGLE_SCOPES",
-    "openid email profile https://www.googleapis.com/auth/gmail.readonly",
+    "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/chat.messages",
   );
   if (!clientId || !clientSecret) {
     const err = new Error("Google OAuth not configured (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)");
@@ -94,6 +120,33 @@ async function exchangeCodeForTokens({ code, clientId, clientSecret, redirectUri
   return json;
 }
 
+async function exchangeRefreshTokenForAccessToken({ refreshToken, clientId, clientSecret }) {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: String(refreshToken || ""),
+      grant_type: "refresh_token",
+    }),
+  });
+  const txt = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(txt);
+  } catch {
+    json = null;
+  }
+  if (!res.ok) {
+    const err = new Error(json?.error_description || json?.error || txt || `HTTP ${res.status}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return json;
+}
+
 async function fetchUserInfo(accessToken) {
   const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
     headers: { authorization: `Bearer ${accessToken}` },
@@ -112,13 +165,14 @@ async function fetchUserInfo(accessToken) {
 module.exports = {
   normalizeAccountKey,
   requireGoogleConfig,
+  resolveGoogleScopesForPurpose,
   buildRedirectUri,
   buildAuthUrl,
   newNonce,
   encodeState,
   decodeState,
   exchangeCodeForTokens,
+  exchangeRefreshTokenForAccessToken,
   fetchUserInfo,
   baseUrlFromReq,
 };
-

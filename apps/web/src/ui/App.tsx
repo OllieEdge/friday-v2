@@ -1,8 +1,11 @@
-import { Menu, Plus, Settings2, X } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { LayoutList, Menu, MessageSquare, Plus, Settings2, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import type { Chat, ChatSummary, CodexAccountsResponse, ContextBundle, ContextMetrics, Message } from "../api/types";
+import type { AuthStatusResponse, Chat, ChatSummary, CodexAccountsResponse, ContextBundle, ContextMetrics, Message } from "../api/types";
+import { AuthOverlay } from "./AuthOverlay";
+import { MessageBubble } from "./MessageBubble";
 import { SettingsPage } from "./SettingsPage";
+import { TriagePage } from "./TriagePage";
 
 type ChatsListResponse = { ok: true; chats: ChatSummary[] };
 type ChatResponse = { ok: true; chat: Chat };
@@ -10,14 +13,16 @@ type CreateChatResponse = { ok: true; chat: Chat };
 type ContextResponse = { ok: true; context: ContextBundle };
 type ContextMetricsResponse = { ok: true; metrics: ContextMetrics };
 type AppendMessagesResponse = { ok: true; messages: Array<{ id: string; role: string; content: string }> };
-type StartStreamResponse = { ok: true; taskId: string; userMessage: Message };
+type StartStreamResponse = { ok: true; taskId: string; userMessage: Message; assistantMessage: Message };
 
 export function App() {
+  const [authStatus, setAuthStatus] = useState<AuthStatusResponse | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [view, setView] = useState<"chat" | "triage">("chat");
 
   const [contextVisible, setContextVisible] = useState(false);
   const [context, setContext] = useState<ContextBundle | null>(null);
@@ -27,9 +32,9 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [accounts, setAccounts] = useState<CodexAccountsResponse | null>(null);
-  const [runStatus, setRunStatus] = useState<string | null>(null);
-  const [runLogs, setRunLogs] = useState<any[]>([]);
   const [sending, setSending] = useState(false);
+  const taskStreamsRef = useRef<Map<string, EventSource>>(new Map());
+  const seenEventsRef = useRef<Map<string, Set<string>>>(new Map());
 
   const activeAccountLabel = useMemo(() => {
     if (!accounts?.activeProfileId) return "No active account";
@@ -43,55 +48,190 @@ export function App() {
     if (!p) return "";
     if (p.authMode !== "api_key") return "";
     const cost = Number(p.totalCostUsd || 0);
+    const estimatedCost = Number(p.estimatedTotalCostUsd || 0);
     const tokens = (Number(p.totalInputTokens) || 0) + (Number(p.totalCachedInputTokens) || 0) + (Number(p.totalOutputTokens) || 0);
-    const costPart = cost > 0 ? ` · $${cost.toFixed(2)}` : "";
+    const costPart = cost > 0 ? ` · $${cost.toFixed(2)}` : estimatedCost > 0 ? ` · ~$${estimatedCost.toFixed(2)}` : "";
     return `Metered: ${tokens.toLocaleString()} tokens${costPart}`;
   }, [accounts]);
 
+  const chatHasRunningTask = useMemo(() => {
+    return Boolean(activeChat?.messages?.some((m) => m.role === "assistant" && m.meta?.run?.status === "running" && m.meta?.run?.taskId));
+  }, [activeChat]);
+
+  const busy = sending || chatHasRunningTask;
+
+  async function refreshAuthStatus() {
+    const res = await api<AuthStatusResponse>("/api/auth/status");
+    setAuthStatus(res);
+    return res;
+  }
+
+  function handleUnauthorized() {
+    setAuthStatus((prev) => (prev ? { ...prev, authenticated: false, user: null } : { ok: true, authenticated: false, hasAnyUsers: true, user: null }));
+    setActiveChat(null);
+    setActiveChatId(null);
+    setChats([]);
+    setSettingsOpen(false);
+  }
+
   async function refreshChats() {
-    const res = await api<ChatsListResponse>("/api/chats");
-    setChats(res.chats);
+    try {
+      const res = await api<ChatsListResponse>("/api/chats");
+      setChats(res.chats);
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+    }
   }
 
   async function loadChat(chatId: string) {
+    setView("chat");
     setActiveChatId(chatId);
-    const res = await api<ChatResponse>(`/api/chats/${chatId}`);
-    setActiveChat(res.chat);
-    setSidebarOpen(false);
+    try {
+      const res = await api<ChatResponse>(`/api/chats/${chatId}`);
+      setActiveChat(res.chat);
+      setSidebarOpen(false);
+      await refreshChats();
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+    }
   }
 
   async function createChat() {
-    const res = await api<CreateChatResponse>("/api/chats", { method: "POST", body: JSON.stringify({}) });
-    await refreshChats();
-    await loadChat(res.chat.id);
+    try {
+      const res = await api<CreateChatResponse>("/api/chats", { method: "POST", body: JSON.stringify({}) });
+      await refreshChats();
+      await loadChat(res.chat.id);
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+    }
   }
 
   async function ensureContext() {
     if (context) return context;
-    const res = await api<ContextResponse>("/api/context");
-    setContext(res.context);
-    return res.context;
+    try {
+      const res = await api<ContextResponse>("/api/context");
+      setContext(res.context);
+      return res.context;
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+      throw e;
+    }
   }
 
   async function refreshContextMetrics() {
-    const res = await api<ContextMetricsResponse>("/api/context/metrics");
-    setContextMetrics(res.metrics);
+    try {
+      const res = await api<ContextMetricsResponse>("/api/context/metrics");
+      setContextMetrics(res.metrics);
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+    }
   }
 
   async function refreshAccounts() {
-    const res = await api<CodexAccountsResponse>("/api/accounts/codex");
-    setAccounts(res);
+    try {
+      const res = await api<CodexAccountsResponse>("/api/accounts/codex");
+      setAccounts(res);
+    } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
+    }
+  }
+
+  function closeTaskStream(taskId: string) {
+    const es = taskStreamsRef.current.get(taskId);
+    if (es) es.close();
+    taskStreamsRef.current.delete(taskId);
+    seenEventsRef.current.delete(taskId);
+  }
+
+  function appendTaskEvent({ taskId, messageId, event }: { taskId: string; messageId: string; event: any }) {
+    const t = String(event?.type || "");
+    if (t === "user_message" || t === "assistant_placeholder" || t === "assistant_message") return;
+
+    const key = JSON.stringify(event ?? {});
+    const seen = seenEventsRef.current.get(taskId) || new Set<string>();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (seen.size > 900) {
+      // prevent unbounded growth; replay duplication is acceptable if it ever happens again.
+      seen.clear();
+    }
+    seenEventsRef.current.set(taskId, seen);
+
+    setActiveChat((prev) => {
+      if (!prev) return prev;
+      const msgs = [...prev.messages];
+      const idx = msgs.findIndex((m) => m.id === messageId);
+      if (idx === -1) return prev;
+      const existing = msgs[idx];
+      const nextEvents = [...(existing.events ?? []), event];
+      msgs[idx] = { ...existing, events: nextEvents };
+      return { ...prev, messages: msgs };
+    });
+  }
+
+  function upsertMessage({ messageId, next }: { messageId: string; next: Message }) {
+    setActiveChat((prev) => {
+      if (!prev) return prev;
+      const msgs = [...prev.messages];
+      const idx = msgs.findIndex((m) => m.id === messageId);
+      if (idx !== -1) {
+        const existing = msgs[idx];
+        msgs[idx] = { ...existing, ...next, events: existing.events ?? next.events ?? [] };
+        return { ...prev, messages: msgs };
+      }
+      msgs.push(next);
+      return { ...prev, messages: msgs };
+    });
+  }
+
+  async function attachTaskStream({ taskId, messageId }: { taskId: string; messageId: string }) {
+    if (!taskId || !messageId) return;
+    if (taskStreamsRef.current.has(taskId)) return;
+
+    // Seed de-duplication with any existing persisted events.
+    const seeded = new Set<string>();
+    const existing = activeChat?.messages?.find((m) => m.id === messageId);
+    for (const ev of existing?.events || []) seeded.add(JSON.stringify(ev ?? {}));
+    seenEventsRef.current.set(taskId, seeded);
+
+    try {
+      await api<{ ok: true; task: { id: string; status: string } }>(`/api/tasks/${taskId}`);
+    } catch {
+      appendTaskEvent({ taskId, messageId, event: { type: "status", stage: "disconnected" } });
+      return;
+    }
+
+    const es = new EventSource(`/api/tasks/${taskId}/events`);
+    taskStreamsRef.current.set(taskId, es);
+
+    es.addEventListener("message", (e) => {
+      const ev = JSON.parse((e as MessageEvent).data);
+      if (ev?.type === "assistant_message") {
+        upsertMessage({ messageId, next: ev.message });
+        return;
+      }
+      if (ev?.type === "usage") void refreshAccounts();
+      appendTaskEvent({ taskId, messageId, event: ev });
+      if (ev?.type === "done" || ev?.type === "canceled") {
+        closeTaskStream(taskId);
+        setSending(false);
+        void refreshChats();
+      }
+    });
+
+    es.addEventListener("error", () => {
+      // server closes it on completion; UI will recover on next chat refresh if needed.
+    });
   }
 
   async function sendMessage() {
     const chatId = activeChatId;
     const content = composer.trim();
     if (!chatId || !content) return;
+    if (busy) return;
 
     setComposer("");
     setSending(true);
-    setRunStatus("Starting…");
-    setRunLogs([]);
 
     const optimisticUser: Message = { id: `tmp-user-${Date.now()}`, role: "user", content, createdAt: new Date().toISOString() };
     const optimisticAssistant: Message = {
@@ -99,6 +239,7 @@ export function App() {
       role: "assistant",
       content: "Thinking…",
       createdAt: new Date().toISOString(),
+      events: [],
     };
     setActiveChat((prev) => (prev ? { ...prev, messages: [...prev.messages, optimisticUser, optimisticAssistant] } : prev));
 
@@ -108,44 +249,25 @@ export function App() {
         body: JSON.stringify({ content }),
       });
 
-      // Replace optimistic user message with the persisted one (keep "thinking" placeholder).
+      // Replace optimistic messages with persisted ones.
+      const assistantId = started.assistantMessage?.id;
       setActiveChat((prev) => {
         if (!prev) return prev;
         const msgs = [...prev.messages];
         const idx = msgs.findIndex((m) => m.id === optimisticUser.id);
         if (idx !== -1) msgs[idx] = started.userMessage;
+        const aIdx = msgs.findIndex((m) => m.id === optimisticAssistant.id);
+        if (aIdx !== -1) msgs[aIdx] = { ...started.assistantMessage, events: started.assistantMessage.events ?? [] };
         return { ...prev, messages: msgs };
       });
 
-      const es = new EventSource(`/api/tasks/${started.taskId}/events`);
-      es.addEventListener("message", (e) => {
-        const ev = JSON.parse((e as MessageEvent).data);
-        if (ev?.type === "status") setRunStatus(String(ev.stage || ""));
-        else if (ev?.type === "codex") setRunLogs((prev) => [...prev, ev.event]);
-        else if (ev?.type === "usage") void refreshAccounts();
-        else if (ev?.type === "assistant_message") {
-          setActiveChat((prev) => {
-            if (!prev) return prev;
-            const msgs = [...prev.messages];
-            const idx = msgs.findIndex((m) => m.id === optimisticAssistant.id);
-            if (idx !== -1) msgs[idx] = ev.message;
-            else msgs.push(ev.message);
-            return { ...prev, messages: msgs };
-          });
-        } else if (ev?.type === "done" || ev?.type === "canceled") {
-          es.close();
-          setSending(false);
-          setRunStatus(null);
-          setRunLogs([]);
-          void refreshChats();
-        }
-      });
-      es.addEventListener("error", () => {
-        // server will close it on completion; keep UI as-is
-      });
+      if (assistantId) await attachTaskStream({ taskId: started.taskId, messageId: assistantId });
     } catch (e: any) {
+      if (String(e?.message || "").includes("unauthorized")) {
+        handleUnauthorized();
+        return;
+      }
       setSending(false);
-      setRunStatus(null);
       setActiveChat((prev) => {
         if (!prev) return prev;
         const msgs = [...prev.messages];
@@ -160,6 +282,9 @@ export function App() {
 
   useEffect(() => {
     (async () => {
+      const st = await refreshAuthStatus();
+      if (!st.authenticated && st.hasAnyUsers) return;
+      if (!st.authenticated && !st.hasAnyUsers) return;
       await refreshChats();
       await refreshAccounts();
       await refreshContextMetrics();
@@ -185,15 +310,45 @@ export function App() {
     }
   }, [chats, activeChatId]);
 
+  useEffect(() => {
+    // Close any in-flight streams when switching chats.
+    for (const taskId of taskStreamsRef.current.keys()) {
+      closeTaskStream(taskId);
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
+    const running = (activeChat?.messages || [])
+      .filter((m) => m.role === "assistant" && m.meta?.run?.status === "running" && m.meta?.run?.taskId)
+      .map((m) => ({ taskId: m.meta!.run!.taskId, messageId: m.id }));
+
+    if (!running.length) return;
+    for (const r of running) void attachTaskStream(r);
+  }, [activeChat]);
+
   const contextText = useMemo(() => {
     if (!context) return "";
     return context.items.map((i) => `# ${i.filename}\n\n${i.content.trim()}\n`).join("\n\n---\n\n");
   }, [context]);
 
   return (
-    <div className={`app${sidebarOpen ? " sidebarOpen" : ""}`}>
+    <div className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" ? " triageMode" : ""}`}>
+      {authStatus && !authStatus.authenticated ? (
+        <AuthOverlay
+          status={authStatus}
+          onAuthed={async () => {
+            const st = await refreshAuthStatus();
+            if (st.authenticated) {
+              await refreshChats();
+              await refreshAccounts();
+              await refreshContextMetrics();
+            }
+          }}
+        />
+      ) : null}
       {sidebarOpen ? <button className="sidebarBackdrop" onClick={() => setSidebarOpen(false)} /> : null}
-      <aside className="sidebar">
+      {view === "chat" ? (
+        <aside className="sidebar">
         <div className="sidebarHeader">
           <div className="brand">Friday v2</div>
           <button className="btn" onClick={() => createChat()} title="New chat">
@@ -216,15 +371,18 @@ export function App() {
           ))}
         </div>
       </aside>
+      ) : null}
 
       <main className="main">
         <header className="topbar">
           <div className="topbarLeft">
             <div className="topbarTitleRow">
-              <button className="btn iconBtn mobileOnly" onClick={() => setSidebarOpen((v) => !v)} title="Chats">
-                {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-              <div className="chatTitle">{activeChat?.title || "Select a chat"}</div>
+              {view === "chat" ? (
+                <button className="btn iconBtn mobileOnly" onClick={() => setSidebarOpen((v) => !v)} title="Chats">
+                  {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+                </button>
+              ) : null}
+              <div className="chatTitle">{view === "triage" ? "Triage" : activeChat?.title || "Select a chat"}</div>
             </div>
             <div className="activeAccount">
               {activeAccountLabel}
@@ -233,75 +391,88 @@ export function App() {
             </div>
           </div>
           <div className="topbarRight">
+            {view === "triage" ? (
+              <button className="btn secondary" onClick={() => setView("chat")} title="Chats">
+                <MessageSquare size={16} />
+                Chats
+              </button>
+            ) : null}
             <button
-              className="btn secondary"
-              onClick={async () => {
-                await ensureContext();
-                await refreshContextMetrics();
-                setContextVisible((v) => !v);
+              className={`btn${view === "triage" ? " secondary" : ""}`}
+              onClick={() => {
+                setSidebarOpen(false);
+                setView("triage");
               }}
+              title="Triage"
             >
-              Context
+              <LayoutList size={16} />
+              Triage
             </button>
+            {view === "chat" ? (
+              <button
+                className="btn secondary"
+                onClick={async () => {
+                  await ensureContext();
+                  await refreshContextMetrics();
+                  setContextVisible((v) => !v);
+                }}
+              >
+                Context
+              </button>
+            ) : null}
             <button className="btn iconBtn" onClick={() => setSettingsOpen(true)} title="Settings">
               <Settings2 size={18} />
             </button>
           </div>
         </header>
 
-        <section className={`contextPanel${contextVisible ? "" : " hidden"}`}>
-          <div className="contextHeader">Loaded context</div>
-          <pre className="contextBody">{contextText}</pre>
-        </section>
+        {view === "chat" ? (
+          <>
+            <section className={`contextPanel${contextVisible ? "" : " hidden"}`}>
+              <div className="contextHeader">Loaded context</div>
+              <pre className="contextBody">{contextText}</pre>
+            </section>
 
-        <section className="messages">
-          {(activeChat?.messages || []).map((m) => (
-            <div key={m.id} className={`msg ${m.role}`}>
-              <div className="msgRole">{m.role}</div>
-              <div className="msgContent">{m.content}</div>
-            </div>
-          ))}
-        </section>
+            <section className="messages">
+              {(activeChat?.messages || []).map((m) => (
+                <MessageBubble key={m.id} message={m} />
+              ))}
+            </section>
 
-        {sending || runStatus || runLogs.length ? (
-          <section className="runPanel">
-            <div className="runHeader">
-              <div style={{ fontWeight: 700 }}>Run</div>
-              <div className="muted">{runStatus || (sending ? "Running…" : "")}</div>
-            </div>
-            {runLogs.length ? (
-              <details>
-                <summary className="muted">Details</summary>
-                <pre className="pre">{runLogs.slice(-200).map((l) => JSON.stringify(l)).join("\n")}</pre>
-              </details>
-            ) : null}
+            <form
+              className="composer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void sendMessage();
+              }}
+            >
+              <textarea
+                className="textarea"
+                rows={3}
+                placeholder="Message Friday…"
+                value={composer}
+                onChange={(e) => setComposer(e.target.value)}
+                disabled={busy}
+              />
+              <button className="btn primary" type="submit" disabled={busy}>
+                Send
+              </button>
+            </form>
+          </>
+        ) : (
+          <section className="triageMain">
+            <TriagePage onOpenChat={(chatId) => loadChat(chatId)} />
           </section>
-        ) : null}
-
-        <form
-          className="composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void sendMessage();
-          }}
-        >
-          <textarea
-            className="textarea"
-            rows={3}
-            placeholder="Message Friday…"
-            value={composer}
-            onChange={(e) => setComposer(e.target.value)}
-            disabled={sending}
-          />
-          <button className="btn primary" type="submit">
-            Send
-          </button>
-        </form>
+        )}
       </main>
 
       {settingsOpen ? (
         <SettingsPage
           onClose={() => setSettingsOpen(false)}
+          onLoggedOut={async () => {
+            await refreshAuthStatus();
+            handleUnauthorized();
+          }}
           accounts={accounts}
           refreshAccounts={refreshAccounts}
           contextMetrics={contextMetrics}

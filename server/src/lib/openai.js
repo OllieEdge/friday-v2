@@ -19,25 +19,26 @@ function buildOpenAiSystemText({ contextText }) {
   );
 }
 
-async function runOpenAiChat({ messages }) {
-  const apiKey = envString("OPENAI_API_KEY", "");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+async function runOpenAiChat({ messages, apiKey, baseUrl, model }) {
+  const resolvedApiKey = String(apiKey || "").trim() || envString("OPENAI_API_KEY", "");
+  if (!resolvedApiKey) throw new Error("OPENAI_API_KEY not set");
 
-  const baseUrl = envString("OPENAI_BASE_URL", "https://api.openai.com").replace(/\/+$/, "");
-  const model = envString("OPENAI_MODEL", "gpt-4o-mini");
+  const resolvedBaseUrl = String(baseUrl || "").trim() || envString("OPENAI_BASE_URL", "https://api.openai.com");
+  const resolvedModel = String(model || "").trim() || envString("OPENAI_MODEL", "gpt-4o-mini");
   const timeoutMs = Number(envString("OPENAI_TIMEOUT_MS", "60000")) || 60000;
+  const base = resolvedBaseUrl.replace(/\/+$/, "");
 
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const resp = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const resp = await fetch(`${base}/v1/chat/completions`, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${apiKey}`,
+        authorization: `Bearer ${resolvedApiKey}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: resolvedModel,
         messages,
       }),
       signal: controller.signal,

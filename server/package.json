@@ -1,9 +1,13 @@
 {
   "name": "@friday-v2/server",
   "private": true,
+  "dependencies": {
+    "@simplewebauthn/server": "^13.2.2"
+  },
   "scripts": {
     "dev": "PORT=3333 node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev:worker": "node worker.js",
+    "start:worker": "node worker.js"
   }
 }
-
