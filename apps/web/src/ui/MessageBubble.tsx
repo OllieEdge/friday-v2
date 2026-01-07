@@ -119,6 +119,26 @@ function runPill(run: RunMeta) {
   return run.status;
 }
 
+function latestUsage(events: any[]) {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const ev = events[i];
+    if (ev?.type === "usage" && ev?.usage) return ev.usage;
+  }
+  return null;
+}
+
+function formatUsage(usage: any) {
+  if (!usage) return "";
+  const inTok = Number(usage.inputTokens) || 0;
+  const cachedTok = Number(usage.cachedInputTokens) || 0;
+  const outTok = Number(usage.outputTokens) || 0;
+  const total = inTok + outTok;
+  if (!total && !cachedTok) return "";
+  const parts = [`${total.toLocaleString()} tok`];
+  if (cachedTok) parts.push(`${cachedTok.toLocaleString()} cached`);
+  return parts.join(" · ");
+}
+
 type MessageBubbleProps = {
   message: Message;
   eventsLimit?: number;
@@ -137,6 +157,7 @@ export function MessageBubble({ message, eventsLimit = 400 }: MessageBubbleProps
     if (last) return last;
     return isRunning ? "Thinking…" : "";
   }, [run, isRunning, prettyLines]);
+  const usageText = useMemo(() => formatUsage(latestUsage(events)), [events]);
 
   const displayContent = isRunning ? activity : String(message.content || "");
 
@@ -158,7 +179,12 @@ export function MessageBubble({ message, eventsLimit = 400 }: MessageBubbleProps
     <div className={`msg ${message.role}`}>
       <div className="msgRoleRow">
         <div className="msgRole">{message.role}</div>
-        {run ? <div className={`runPill ${run.status}`}>{runPill(run)}</div> : null}
+        {run ? (
+          <div className={`runPill ${run.status}`}>
+            {runPill(run)}
+            {usageText ? <span className="runPillUsage">{usageText}</span> : null}
+          </div>
+        ) : null}
       </div>
       <div className="msgContent">
         <Markdown className="md" content={displayContent} />
