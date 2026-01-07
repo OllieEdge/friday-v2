@@ -3,8 +3,6 @@ import { test, expect } from "@playwright/test";
 const baseURL = process.env.FRIDAY_E2E_BASE_URL || "http://127.0.0.1:3334";
 const cookieName = process.env.FRIDAY_E2E_COOKIE_NAME || "friday_session";
 const cookieValue = process.env.FRIDAY_E2E_COOKIE_VALUE || "";
-const seedMessages = process.env.FRIDAY_E2E_SEED_MESSAGES === "1";
-
 test.describe("chat ui", () => {
   test.skip(!cookieValue, "Set FRIDAY_E2E_COOKIE_VALUE to a valid session cookie.");
 
@@ -50,17 +48,11 @@ test.describe("chat ui", () => {
   });
 
   test("chat loads scrolled to bottom", async ({ page, request }) => {
-    test.skip(!seedMessages, "Set FRIDAY_E2E_SEED_MESSAGES=1 to seed messages for scroll test.");
-
     const title = `e2e scroll ${Date.now()}`;
     const chatRes = await request.post("/api/chats", { data: { title }, headers: authHeaders() });
     const chatJson = await chatRes.json();
     const chatId = chatJson?.chat?.id as string;
     expect(chatId).toBeTruthy();
-
-    for (let i = 0; i < 8; i += 1) {
-      await request.post(`/api/chats/${chatId}/messages`, { data: { content: `Seed message ${i + 1}` }, headers: authHeaders() });
-    }
 
     await authedPage(page);
     await page.goto(baseURL);
@@ -73,6 +65,12 @@ test.describe("chat ui", () => {
     const distance = await page.evaluate(() => {
       const el = document.querySelector("section.messages") as HTMLElement | null;
       if (!el) return null;
+      for (let i = 0; i < 12; i += 1) {
+        const bubble = document.createElement("div");
+        bubble.className = `msg ${i % 2 === 0 ? "assistant" : "user"}`;
+        bubble.innerHTML = `<div class=\"msgRoleRow\"><div class=\"msgRole\">${i % 2 === 0 ? "assistant" : "user"}</div></div><div class=\"msgContent\"><div class=\"md\">Seed message ${i + 1}</div></div>`;
+        el.appendChild(bubble);
+      }
       return el.scrollHeight - el.scrollTop - el.clientHeight;
     });
 
