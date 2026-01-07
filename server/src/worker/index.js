@@ -146,7 +146,13 @@ async function runChatTask({ task }) {
 }
 
 async function tick() {
-  const task = tasks.claimNextQueued({ kind: "chat_run" });
+  let task = null;
+  try {
+    task = tasks.claimNextQueued({ kind: "chat_run" });
+  } catch (e) {
+    if (e && typeof e === "object" && (e.errcode === 5 || e.code === "ERR_SQLITE_ERROR")) return false;
+    throw e;
+  }
   if (!task) return false;
   await runChatTask({ task });
   return true;

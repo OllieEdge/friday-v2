@@ -92,6 +92,8 @@ function prettyTaskEvent(ev: any): string[] {
     const label = stageLabel(String(ev?.stage || ""));
     return label ? [label] : [];
   }
+  if (type === "done") return ["Done."];
+  if (type === "canceled") return ["Canceled."];
   if (type === "codex") return prettyCodexEvent(ev?.event);
   if (type === "device") return ["Waiting for device login…"];
   if (type === "error") return [String(ev?.message || "Error")];

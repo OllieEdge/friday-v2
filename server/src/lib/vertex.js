@@ -306,7 +306,11 @@ async function getVertexContextCache({
   const sys = normalizeString(systemText);
   if (!sys) return null;
 
-  const key = buildContextCacheKey({ projectId, location, model, systemText: sys });
+  const resolvedProjectId = normalizeString(projectId) || envString("VERTEX_PROJECT_ID", "tmg-product-innovation-prod");
+  const resolvedLocation = normalizeString(location) || envString("VERTEX_LOCATION", "europe-west2");
+  const resolvedModel = normalizeString(model) || envString("VERTEX_MODEL", "gemini-2.0-flash");
+
+  const key = buildContextCacheKey({ projectId: resolvedProjectId, location: resolvedLocation, model: resolvedModel, systemText: sys });
   const cached = cachedContextByKey.get(key);
   if (cached?.name && cached?.expiresAtMs && cached.expiresAtMs - Date.now() > 60_000) return cached.name;
 
@@ -314,9 +318,9 @@ async function getVertexContextCache({
     normalizeString(accessToken) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey }));
   const ttlSeconds = resolveCacheTtlSeconds();
   const created = await createVertexCachedContent({
-    projectId,
-    location,
-    model,
+    projectId: resolvedProjectId,
+    location: resolvedLocation,
+    model: resolvedModel,
     systemText: sys,
     accessToken: token,
     ttlSeconds,
