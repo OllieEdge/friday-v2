@@ -61,6 +61,17 @@ Gemini can run code via Vertex’s Code Execution tool. To enable it:
 This executes in Google’s managed environment (no access to this machine’s filesystem).
 When code execution is enabled, context caching is disabled for Vertex to avoid API conflicts.
 
+## Tool execution on host (optional)
+
+Gemini can call a host-exec tool (function calling) when explicitly enabled:
+
+- `VERTEX_TOOL_EXEC=1`
+- `FRIDAY_TOOL_HMAC_SECRET=...` (HMAC secret for `/api/tools/exec`)
+- `FRIDAY_TOOL_ALLOW_ALL=1` (allow any command; `confirm=true` still required per call)
+
+Tool calls are executed on the Friday host and are still subject to explicit confirmation in the request payload.
+When tool execution is enabled, context caching is disabled for Vertex to avoid API conflicts.
+
 ## Operational notes
 
 - Uses Vertex `:generateContent` and runs inside `friday-server`/`friday-worker`.

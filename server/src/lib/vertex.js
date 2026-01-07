@@ -424,7 +424,137 @@ async function vertexGenerateText({
   return { content: normalizeString(out), usage };
 }
 
-async function runVertexChat({ system, messages, projectId, location, model, authMode, googleAccounts, googleAccountKey }) {
+function toVertexRole(role) {
+  const r = String(role || "").toLowerCase();
+  if (r === "assistant") return "model";
+  if (r === "model") return "model";
+  if (r === "tool" || r === "function") return "user";
+  return "user";
+}
+
+function buildVertexContents(messages) {
+  return (messages || [])
+    .filter((m) => m && m.role)
+    .map((m) => {
+      const parts = [];
+      const text = normalizeString(m.content);
+      if (text) parts.push({ text });
+      const toolCall = m?.toolCall;
+      if (toolCall?.name) {
+        parts.push({ functionCall: { name: String(toolCall.name), args: toolCall.args || {} } });
+      }
+      const toolResponse = m?.toolResponse;
+      if (toolResponse?.name) {
+        parts.push({ functionResponse: { name: String(toolResponse.name), response: toolResponse.response || {} } });
+      }
+      if (!parts.length) return null;
+      const hasToolResponse = Boolean(toolResponse?.name);
+      const hasToolCall = Boolean(toolCall?.name);
+      const role = hasToolResponse ? "user" : hasToolCall ? "model" : toVertexRole(m.role);
+      return { role, parts };
+    })
+    .filter(Boolean);
+}
+
+function extractFunctionCalls(parts) {
+  if (!Array.isArray(parts)) return [];
+  return parts
+    .map((p) => p?.functionCall)
+    .filter((f) => f && f.name)
+    .map((f) => ({ name: String(f.name), args: f.args || {} }));
+}
+
+function sumUsage(left, right) {
+  if (!left && !right) return null;
+  return {
+    inputTokens: (left?.inputTokens || 0) + (right?.inputTokens || 0),
+    cachedInputTokens: (left?.cachedInputTokens || 0) + (right?.cachedInputTokens || 0),
+    outputTokens: (left?.outputTokens || 0) + (right?.outputTokens || 0),
+  };
+}
+
+async function vertexGenerateWithTools({
+  projectId,
+  location,
+  model,
+  system,
+  messages,
+  tools,
+  temperature = 0.2,
+  maxOutputTokens,
+  authMode,
+  googleAccounts,
+  googleAccountKey,
+}) {
+  const resolvedProjectId = normalizeString(projectId) || envString("VERTEX_PROJECT_ID", "tmg-product-innovation-prod");
+  const resolvedLocation = normalizeString(location) || envString("VERTEX_LOCATION", "europe-west2");
+  const resolvedModel = normalizeString(model) || envString("VERTEX_MODEL", "gemini-2.0-flash");
+  if (!resolvedProjectId) throw new Error("Vertex project not set");
+
+  const accessToken = await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey });
+
+  const url =
+    `https://${resolvedLocation}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(resolvedProjectId)}` +
+    `/locations/${encodeURIComponent(resolvedLocation)}/publishers/google/models/${encodeURIComponent(resolvedModel)}:generateContent`;
+
+  const resolvedMaxOutputTokens = Number.isFinite(Number(maxOutputTokens))
+    ? Number(maxOutputTokens)
+    : envNumber("VERTEX_MAX_OUTPUT_TOKENS", 1024);
+  const payload = {
+    contents: buildVertexContents(messages),
+    tools,
+    generationConfig: {
+      temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : 0.2,
+      maxOutputTokens: Math.max(64, Math.min(65536, resolvedMaxOutputTokens || 1024)),
+    },
+  };
+  const sys = normalizeString(system);
+  if (sys) payload.systemInstruction = { role: "system", parts: [{ text: sys }] };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok) throw new Error(json?.error?.message || json?.message || text || `HTTP ${res.status}`);
+
+  const parts = json?.candidates?.[0]?.content?.parts;
+  const out = normalizeOutputParts(parts);
+  const toolCalls = extractFunctionCalls(parts);
+  const usage = json?.usageMetadata
+    ? {
+        inputTokens: Number(json.usageMetadata.promptTokenCount) || 0,
+        cachedInputTokens:
+          Number(json.usageMetadata.cachedContentTokenCount) ||
+          Number(json.usageMetadata.cachedInputTokenCount) ||
+          Number(json.usageMetadata.cachedTokenCount) ||
+          0,
+        outputTokens: Number(json.usageMetadata.candidatesTokenCount) || 0,
+      }
+    : null;
+
+  return { content: normalizeString(out), usage, toolCalls };
+}
+
+async function runVertexChat({
+  system,
+  messages,
+  projectId,
+  location,
+  model,
+  authMode,
+  googleAccounts,
+  googleAccountKey,
+  toolHandler,
+}) {
   const systemText = normalizeString(system);
   const messagePrompt = buildConversationPrompt({ system: "", messages });
   const fullPrompt = buildConversationPrompt({ system: systemText, messages });
@@ -432,7 +562,8 @@ async function runVertexChat({ system, messages, projectId, location, model, aut
 
   let cachedContent = null;
   const enableCodeExecution = normalizeBoolean(envString("VERTEX_CODE_EXECUTION", ""));
-  if (!enableCodeExecution && systemText && messagePrompt) {
+  const enableToolExec = normalizeBoolean(envString("VERTEX_TOOL_EXEC", ""));
+  if (!enableCodeExecution && !enableToolExec && systemText && messagePrompt) {
     try {
       cachedContent = await getVertexContextCache({
         projectId,
@@ -447,6 +578,80 @@ async function runVertexChat({ system, messages, projectId, location, model, aut
       console.warn("[vertex] context cache create failed", err instanceof Error ? err.message : String(err));
       cachedContent = null;
     }
+  }
+
+  if (enableToolExec) {
+    const tools = [
+      {
+        functionDeclarations: [
+          {
+            name: "exec_command",
+            description: "Execute a shell command on the Friday host.",
+            parameters: {
+              type: "object",
+              properties: {
+                command: { type: "string" },
+                args: { type: "array", items: { type: "string" } },
+                cwd: { type: "string" },
+                timeoutMs: { type: "number" },
+                confirm: { type: "boolean" },
+              },
+              required: ["command", "confirm"],
+            },
+          },
+        ],
+      },
+    ];
+    if (enableCodeExecution) tools.push({ codeExecution: {} });
+    let totalUsage = null;
+    let nextMessages = messages;
+    let result = await vertexGenerateWithTools({
+      projectId,
+      location,
+      model,
+      system: systemText,
+      messages: nextMessages,
+      tools,
+      authMode,
+      googleAccounts,
+      googleAccountKey,
+    });
+    totalUsage = sumUsage(totalUsage, result.usage);
+
+    if (!result.toolCalls?.length || typeof toolHandler !== "function") {
+      return { content: result.content, usage: totalUsage };
+    }
+
+    let iterations = 0;
+    while (result.toolCalls?.length && typeof toolHandler === "function" && iterations < 3) {
+      const toolMessages = [];
+      for (const call of result.toolCalls) {
+        let response = null;
+        try {
+          response = await toolHandler(call);
+        } catch (err) {
+          response = { ok: false, error: String(err?.message || err) };
+        }
+        toolMessages.push({ role: "assistant", toolCall: call });
+        toolMessages.push({ role: "tool", toolResponse: { name: call.name, response } });
+      }
+      nextMessages = [...nextMessages, ...toolMessages];
+      result = await vertexGenerateWithTools({
+        projectId,
+        location,
+        model,
+        system: systemText,
+        messages: nextMessages,
+        tools,
+        authMode,
+        googleAccounts,
+        googleAccountKey,
+      });
+      totalUsage = sumUsage(totalUsage, result.usage);
+      iterations += 1;
+    }
+
+    return { content: result.content, usage: totalUsage };
   }
 
   if (cachedContent) {

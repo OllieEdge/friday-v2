@@ -3,6 +3,7 @@ const { envString } = require("../config/env");
 const { ROOT_DIR } = require("../config/paths");
 const { buildPrompt, resolveCodexPath, runCodexExec, runCodexLoginStatus } = require("./codex");
 const { buildOpenAiSystemText, runOpenAiChat } = require("./openai");
+const { execCommand } = require("./tool-exec");
 const { runVertexChat } = require("./vertex");
 
 function buildContextText(contextItems) {
@@ -103,6 +104,20 @@ async function runVertex({ context, chat, prefs, googleAccounts }) {
     .filter((m) => m && m.role && m.content != null)
     .map((m) => ({ role: toOpenAiRole(m.role), content: String(m.content || "") }));
 
+  const toolHandler = async (call) => {
+    if (!call || call.name !== "exec_command") {
+      return { ok: false, error: "unknown_tool" };
+    }
+    const args = call.args || {};
+    return execCommand({
+      command: args.command,
+      args: args.args,
+      cwd: args.cwd,
+      timeoutMs: args.timeoutMs,
+      confirm: args.confirm,
+    });
+  };
+
   const result = await runVertexChat({
     system,
     messages,
@@ -112,6 +127,7 @@ async function runVertex({ context, chat, prefs, googleAccounts }) {
     authMode: prefs?.vertex?.authMode || "",
     googleAccountKey: prefs?.vertex?.googleAccountKey || "",
     googleAccounts,
+    toolHandler,
   });
   return { runner: "vertex", content: result.content, usage: result.usage };
 }

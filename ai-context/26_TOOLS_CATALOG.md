@@ -19,6 +19,10 @@ Friday v2 should treat these as canonical references when answering “how do I�
   - list triage items
   - set status / set priority
   - record/list feedback events (dismiss/completed/notes)
+- Tool execution endpoint: `POST /api/tools/exec`
+  - HMAC-authenticated (headers: `x-friday-tool-timestamp`, `x-friday-tool-nonce`, `x-friday-tool-signature`)
+  - Body: `{ command, args?, cwd?, timeoutMs?, confirm }`
+  - Requires env: `FRIDAY_TOOL_HMAC_SECRET` and `FRIDAY_TOOL_ALLOW_ALL=1`
 
 ## `olivers-tools` (“eip-tools”)
 

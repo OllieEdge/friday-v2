@@ -132,7 +132,7 @@ export type RunnerSettingsResponse = {
   prefs: RunnerPrefs;
   effective: { runner: string; source: "env" | "settings" };
   env: { FRIDAY_RUNNER: string | null };
-  caps?: { vertexCodeExecution?: boolean };
+  caps?: { vertexCodeExecution?: boolean; vertexToolExec?: boolean };
 };
 
 export type VertexModelProbeResult = { id: string; ok: boolean; error?: string };

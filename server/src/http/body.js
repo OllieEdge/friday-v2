@@ -26,5 +26,4 @@ async function readJson(req) {
   }
 }
 
-module.exports = { readJson };
-
+module.exports = { readBody, readJson };

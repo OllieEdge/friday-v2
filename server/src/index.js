@@ -31,6 +31,7 @@ const { registerGoogleAccounts } = require("./routes/accounts-google");
 const { registerMicrosoftAccounts } = require("./routes/accounts-microsoft");
 const { registerRunnerSettings } = require("./routes/runner-settings");
 const { registerModels } = require("./routes/models");
+const { registerTools } = require("./routes/tools");
 const { registerTriage } = require("./routes/triage");
 const { registerRunbooks } = require("./routes/runbooks");
 const { registerAuth, requireUser } = require("./routes/auth");
@@ -108,6 +109,7 @@ registerTasks(router, { tasks });
   registerMicrosoftAccounts(router, { microsoftAccounts });
 registerRunnerSettings(router, { settings });
 registerModels(router, { settings, googleAccounts });
+registerTools(router);
 registerTriage(router, { triage });
 registerRunbooks(router, {
   runbooksDir: RUNBOOKS_DIR,
@@ -132,6 +134,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/oauth/")) {
       const isPublic =
         url.pathname === "/api/health" ||
+        url.pathname === "/api/tools/exec" ||
         url.pathname.startsWith("/api/auth/") ||
         // allow OAuth callbacks to read the session cookie if present; otherwise they'll be rejected by handler.
         url.pathname.startsWith("/oauth/");

@@ -66,6 +66,7 @@ function registerRunnerSettings(router, { settings }) {
     const effective = resolveEffectiveRunner({ settings });
     const caps = {
       vertexCodeExecution: isTruthy(envString("VERTEX_CODE_EXECUTION", "")),
+      vertexToolExec: isTruthy(envString("VERTEX_TOOL_EXEC", "")),
     };
     return sendJson(res, 200, { ok: true, prefs, effective, env: { FRIDAY_RUNNER: envString("FRIDAY_RUNNER", "") || null }, caps });
   });
