@@ -94,12 +94,17 @@ test.describe("chat ui", () => {
       messages.scrollTop = messages.scrollHeight;
       const msgBox = lastMsg.getBoundingClientRect();
       const composerBox = composer.getBoundingClientRect();
-      return msgBox.bottom - composerBox.top;
+      return {
+        overlap: msgBox.bottom - composerBox.top,
+        messagesBottom: messages.getBoundingClientRect().bottom,
+        composerTop: composerBox.top,
+      };
     });
 
     expect(overlap).not.toBeNull();
-    if (typeof overlap === "number") {
-      expect(overlap).toBeLessThanOrEqual(1);
+    if (overlap && typeof overlap === "object") {
+      expect(overlap.overlap).toBeLessThanOrEqual(1);
+      expect(overlap.messagesBottom).toBeLessThanOrEqual(overlap.composerTop + 1);
     }
   });
 });

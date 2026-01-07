@@ -109,7 +109,7 @@ textarea {
 
 .main {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     "topbar"
     "context"
@@ -211,6 +211,7 @@ textarea {
   min-height: 0;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  scroll-padding-bottom: var(--composer-height);
 }
 
 .triageMain {
@@ -352,7 +353,7 @@ textarea {
 .msg {
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
   max-width: 920px;
   font-size: 14px;
@@ -380,7 +381,7 @@ textarea {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .runPill {
@@ -434,11 +435,11 @@ textarea {
   }
 
   p {
-    margin: 0 0 10px 0;
+    margin: 0;
   }
 
-  p:last-child {
-    margin-bottom: 0;
+  p + p {
+    margin-top: 8px;
   }
 
   ul,

@@ -1,5 +1,5 @@
 import { LayoutList, Menu, MessageSquare, Plus, Settings2, X } from "lucide-react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type {
   AuthStatusResponse,
@@ -371,7 +371,7 @@ export function App() {
     requestAnimationFrame(() => scrollMessagesToBottom(false));
   }, [activeChatId, activeChat?.messages?.length]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const main = mainRef.current;
     const composer = composerRef.current;
     if (!main || !composer) return;
