@@ -236,6 +236,95 @@ function buildConversationPrompt({ system, messages }) {
   return lines.join("\n\n").trim();
 }
 
+function normalizeBoolean(value) {
+  const v = normalizeString(value).toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function resolveCacheTtlSeconds() {
+  const raw = Number(envString("VERTEX_CONTEXT_CACHE_TTL_S", ""));
+  if (Number.isFinite(raw) && raw > 0) return Math.min(86_400, Math.max(60, Math.floor(raw)));
+  return 3600;
+}
+
+const cachedContextByKey = new Map(); // key -> { name, expiresAtMs }
+
+function buildContextCacheKey({ projectId, location, model, systemText }) {
+  const hash = crypto.createHash("sha256").update(systemText).digest("hex");
+  return `${projectId}|${location}|${model}|${hash}`;
+}
+
+async function createVertexCachedContent({ projectId, location, model, systemText, accessToken, ttlSeconds }) {
+  const url =
+    `https://${location}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
+    `/locations/${encodeURIComponent(location)}/cachedContents`;
+  const modelPath =
+    `projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(location)}` +
+    `/publishers/google/models/${encodeURIComponent(model)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model: modelPath,
+      contents: [{ role: "user", parts: [{ text: normalizeString(systemText) }] }],
+      ttl: `${ttlSeconds}s`,
+    }),
+  });
+
+  const text = await res.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok) throw new Error(json?.error?.message || json?.message || text || `HTTP ${res.status}`);
+
+  const name = normalizeString(json?.name);
+  if (!name) throw new Error("Vertex cachedContent response missing name");
+
+  let expiresAtMs = Date.now() + ttlSeconds * 1000;
+  if (json?.expireTime) {
+    const parsed = Date.parse(String(json.expireTime));
+    if (!Number.isNaN(parsed)) expiresAtMs = parsed;
+  }
+  return { name, expiresAtMs };
+}
+
+async function getVertexContextCache({
+  projectId,
+  location,
+  model,
+  systemText,
+  accessToken,
+  authMode,
+  googleAccounts,
+  googleAccountKey,
+}) {
+  if (!normalizeBoolean(envString("VERTEX_CONTEXT_CACHE", ""))) return null;
+  const sys = normalizeString(systemText);
+  if (!sys) return null;
+
+  const key = buildContextCacheKey({ projectId, location, model, systemText: sys });
+  const cached = cachedContextByKey.get(key);
+  if (cached?.name && cached?.expiresAtMs && cached.expiresAtMs - Date.now() > 60_000) return cached.name;
+
+  const token =
+    normalizeString(accessToken) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey }));
+  const ttlSeconds = resolveCacheTtlSeconds();
+  const created = await createVertexCachedContent({
+    projectId,
+    location,
+    model,
+    systemText: sys,
+    accessToken: token,
+    ttlSeconds,
+  });
+  cachedContextByKey.set(key, created);
+  return created.name;
+}
+
 async function vertexGenerateText({
   projectId,
   location,
@@ -243,6 +332,7 @@ async function vertexGenerateText({
   prompt,
   temperature = 0.2,
   maxOutputTokens = 1024,
+  cachedContent,
   authMode,
   googleAccounts,
   googleAccountKey,
@@ -259,16 +349,20 @@ async function vertexGenerateText({
     `https://${resolvedLocation}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(resolvedProjectId)}` +
     `/locations/${encodeURIComponent(resolvedLocation)}/publishers/google/models/${encodeURIComponent(resolvedModel)}:generateContent`;
 
+  const payload = {
+    contents: [{ role: "user", parts: [{ text: normalizeString(prompt) }] }],
+    generationConfig: {
+      temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : 0.2,
+      maxOutputTokens: Math.max(64, Math.min(8192, Number(maxOutputTokens) || 1024)),
+    },
+  };
+  const cached = normalizeString(cachedContent);
+  if (cached) payload.cachedContent = cached;
+
   const res = await fetch(url, {
     method: "POST",
     headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: normalizeString(prompt) }] }],
-      generationConfig: {
-        temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : 0.2,
-        maxOutputTokens: Math.max(64, Math.min(8192, Number(maxOutputTokens) || 1024)),
-      },
-    }),
+    body: JSON.stringify(payload),
   });
 
   const text = await res.text();
@@ -285,7 +379,11 @@ async function vertexGenerateText({
   const usage = json?.usageMetadata
     ? {
         inputTokens: Number(json.usageMetadata.promptTokenCount) || 0,
-        cachedInputTokens: 0,
+        cachedInputTokens:
+          Number(json.usageMetadata.cachedContentTokenCount) ||
+          Number(json.usageMetadata.cachedInputTokenCount) ||
+          Number(json.usageMetadata.cachedTokenCount) ||
+          0,
         outputTokens: Number(json.usageMetadata.candidatesTokenCount) || 0,
       }
     : null;
@@ -294,9 +392,43 @@ async function vertexGenerateText({
 }
 
 async function runVertexChat({ system, messages, projectId, location, model, authMode, googleAccounts, googleAccountKey }) {
-  const prompt = buildConversationPrompt({ system, messages });
-  if (!prompt) return { content: "", usage: null };
-  return vertexGenerateText({ projectId, location, model, prompt, authMode, googleAccounts, googleAccountKey });
+  const systemText = normalizeString(system);
+  const messagePrompt = buildConversationPrompt({ system: "", messages });
+  const fullPrompt = buildConversationPrompt({ system: systemText, messages });
+  if (!fullPrompt) return { content: "", usage: null };
+
+  let cachedContent = null;
+  if (systemText && messagePrompt) {
+    try {
+      cachedContent = await getVertexContextCache({
+        projectId,
+        location,
+        model,
+        systemText,
+        authMode,
+        googleAccounts,
+        googleAccountKey,
+      });
+    } catch (err) {
+      console.warn("[vertex] context cache create failed", err instanceof Error ? err.message : String(err));
+      cachedContent = null;
+    }
+  }
+
+  if (cachedContent) {
+    return vertexGenerateText({
+      projectId,
+      location,
+      model,
+      prompt: messagePrompt,
+      cachedContent,
+      authMode,
+      googleAccounts,
+      googleAccountKey,
+    });
+  }
+
+  return vertexGenerateText({ projectId, location, model, prompt: fullPrompt, authMode, googleAccounts, googleAccountKey });
 }
 
 async function vertexProbeModelIds({ projectId, location, modelIds, authMode, googleAccounts, googleAccountKey, accessToken: accessTokenOverride }) {

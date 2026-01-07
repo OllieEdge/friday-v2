@@ -38,6 +38,14 @@ Friday v2 can run Gemini via **Google Vertex AI** (server-side) when the assista
 - If `.env` sets `FRIDAY_RUNNER=vertex`, the UI runner selector is ignored.
 - If `.env` sets `FRIDAY_RUNNER=settings`, the UI controls which runner is used.
 
+## Context caching (optional)
+
+Vertex is stateless by default; Friday v2 normally sends the full context bundle on every request. To cache the
+context bundle on the Vertex side and reduce repeated prompt tokens:
+
+- `VERTEX_CONTEXT_CACHE=1`
+- optional: `VERTEX_CONTEXT_CACHE_TTL_S=3600` (min 60, max 86400)
+
 ## Operational notes
 
 - Uses Vertex `:generateContent` and runs inside `friday-server`/`friday-worker`.
