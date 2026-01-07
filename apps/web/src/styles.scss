@@ -352,7 +352,7 @@ textarea {
 .msg {
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px 12px;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
   max-width: 920px;
   font-size: 14px;
@@ -380,7 +380,7 @@ textarea {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .runPill {

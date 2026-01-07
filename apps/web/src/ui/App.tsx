@@ -47,6 +47,8 @@ export function App() {
   const seenEventsRef = useRef<Map<string, Set<string>>>(new Map());
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const lastChatIdRef = useRef<string | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const composerRef = useRef<HTMLFormElement | null>(null);
 
   const activeAccountLabel = useMemo(() => {
     if (!accounts?.activeProfileId) return "No active account";
@@ -369,6 +371,26 @@ export function App() {
     requestAnimationFrame(() => scrollMessagesToBottom(false));
   }, [activeChatId, activeChat?.messages?.length]);
 
+  useEffect(() => {
+    const main = mainRef.current;
+    const composer = composerRef.current;
+    if (!main || !composer) return;
+    const update = () => {
+      main.style.setProperty("--composer-height", `${composer.offsetHeight}px`);
+    };
+    update();
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => update());
+      observer.observe(composer);
+    }
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
   const contextText = useMemo(() => {
     if (!context) return "";
     return context.items.map((i) => `# ${i.filename}\n\n${i.content.trim()}\n`).join("\n\n---\n\n");
@@ -460,7 +482,7 @@ export function App() {
       </aside>
       ) : null}
 
-      <main className="main">
+      <main className="main" ref={mainRef}>
         <header className="topbar">
           <div className="topbarLeft">
             <div className="topbarTitleRow">
@@ -534,6 +556,7 @@ export function App() {
 
             <form
               className="composer"
+              ref={composerRef}
               onSubmit={(e) => {
                 e.preventDefault();
                 void sendMessage();
