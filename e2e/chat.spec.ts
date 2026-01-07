@@ -85,5 +85,21 @@ test.describe("chat ui", () => {
     if (typeof distance === "number") {
       expect(distance).toBeLessThanOrEqual(4);
     }
+
+    const overlap = await page.evaluate(() => {
+      const messages = document.querySelector("section.messages") as HTMLElement | null;
+      const lastMsg = document.querySelector("section.messages .msg:last-child") as HTMLElement | null;
+      const composer = document.querySelector("form.composer") as HTMLElement | null;
+      if (!messages || !lastMsg || !composer) return null;
+      messages.scrollTop = messages.scrollHeight;
+      const msgBox = lastMsg.getBoundingClientRect();
+      const composerBox = composer.getBoundingClientRect();
+      return msgBox.bottom - composerBox.top;
+    });
+
+    expect(overlap).not.toBeNull();
+    if (typeof overlap === "number") {
+      expect(overlap).toBeLessThanOrEqual(1);
+    }
   });
 });

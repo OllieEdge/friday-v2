@@ -118,6 +118,7 @@ textarea {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  --composer-height: 96px;
 }
 
 .topbar {
@@ -203,6 +204,7 @@ textarea {
 .messages {
   grid-area: messages;
   padding: 18px 16px;
+  padding-bottom: calc(18px + var(--composer-height));
   overflow: auto;
   display: grid;
   gap: 12px;
@@ -531,6 +533,7 @@ textarea {
   position: sticky;
   bottom: 0;
   z-index: 20;
+  min-height: var(--composer-height);
 }
 
 .textarea {
@@ -975,5 +978,6 @@ textarea {
 
   .messages {
     padding: 12px 12px;
+    padding-bottom: calc(12px + var(--composer-height));
   }
 }
