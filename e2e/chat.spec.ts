@@ -8,11 +8,8 @@ const seedMessages = process.env.FRIDAY_E2E_SEED_MESSAGES === "1";
 test.describe("chat ui", () => {
   test.skip(!cookieValue, "Set FRIDAY_E2E_COOKIE_VALUE to a valid session cookie.");
 
-  async function authedApi(request: any) {
-    return request.newContext({
-      baseURL,
-      extraHTTPHeaders: { Cookie: `${cookieName}=${cookieValue}` },
-    });
+  function authHeaders() {
+    return { Cookie: `${cookieName}=${cookieValue}` };
   }
 
   async function authedPage(page: any) {
@@ -30,9 +27,8 @@ test.describe("chat ui", () => {
   }
 
   test("composer stays visible on desktop", async ({ page, request }) => {
-    const api = await authedApi(request);
     const title = `e2e chat ${Date.now()}`;
-    const chatRes = await api.post("/api/chats", { data: { title } });
+    const chatRes = await request.post("/api/chats", { data: { title }, headers: authHeaders() });
     const chatJson = await chatRes.json();
     const chatId = chatJson?.chat?.id as string;
     expect(chatId).toBeTruthy();
@@ -56,15 +52,14 @@ test.describe("chat ui", () => {
   test("chat loads scrolled to bottom", async ({ page, request }) => {
     test.skip(!seedMessages, "Set FRIDAY_E2E_SEED_MESSAGES=1 to seed messages for scroll test.");
 
-    const api = await authedApi(request);
     const title = `e2e scroll ${Date.now()}`;
-    const chatRes = await api.post("/api/chats", { data: { title } });
+    const chatRes = await request.post("/api/chats", { data: { title }, headers: authHeaders() });
     const chatJson = await chatRes.json();
     const chatId = chatJson?.chat?.id as string;
     expect(chatId).toBeTruthy();
 
     for (let i = 0; i < 8; i += 1) {
-      await api.post(`/api/chats/${chatId}/messages`, { data: { content: `Seed message ${i + 1}` } });
+      await request.post(`/api/chats/${chatId}/messages`, { data: { content: `Seed message ${i + 1}` }, headers: authHeaders() });
     }
 
     await authedPage(page);
