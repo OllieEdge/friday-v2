@@ -431,7 +431,8 @@ async function runVertexChat({ system, messages, projectId, location, model, aut
   if (!fullPrompt) return { content: "", usage: null };
 
   let cachedContent = null;
-  if (systemText && messagePrompt) {
+  const enableCodeExecution = normalizeBoolean(envString("VERTEX_CODE_EXECUTION", ""));
+  if (!enableCodeExecution && systemText && messagePrompt) {
     try {
       cachedContent = await getVertexContextCache({
         projectId,

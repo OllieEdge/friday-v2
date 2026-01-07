@@ -109,4 +109,27 @@ test.describe("chat ui", () => {
       expect(overlap.messagesBottom).toBeLessThanOrEqual(overlap.composerTop + 1);
     }
   });
+
+  test("vertex code-exec prompt does not error", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const title = `e2e codeexec ${Date.now()}`;
+    await createChat(request, title);
+
+    await authedPage(page);
+    await page.goto(baseURL);
+    await page.getByText(title, { exact: true }).first().click();
+
+    const textarea = page.locator("form.composer textarea");
+    await textarea.fill(
+      "Id like to test your ability to change files next, could you see if you can add the functionality to paste images in to this chat composer please? the functionality would be that im typing and when i paste a image from the clipboard it gets uploaded to you (via new api endpoint) and appears in a new attachments section above the composer input field, where i can also remove them (in case it was added by mistake), or click on them to view.",
+    );
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const lastAssistant = page.locator(".msg.assistant").last();
+    await expect(lastAssistant.locator(".runPill.done")).toBeVisible();
+
+    const content = await lastAssistant.textContent();
+    expect(content || "").not.toMatch(/Runner error/i);
+    expect(content || "").not.toMatch(/tools and system instruction should not be set/i);
+  });
 });

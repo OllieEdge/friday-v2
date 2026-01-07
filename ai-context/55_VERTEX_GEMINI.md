@@ -59,6 +59,7 @@ Gemini can run code via Vertex’s Code Execution tool. To enable it:
 - `VERTEX_CODE_EXECUTION=1`
 
 This executes in Google’s managed environment (no access to this machine’s filesystem).
+When code execution is enabled, context caching is disabled for Vertex to avoid API conflicts.
 
 ## Operational notes
 
