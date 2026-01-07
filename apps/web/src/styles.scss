@@ -118,7 +118,6 @@ textarea {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  --composer-height: 96px;
 }
 
 .topbar {
@@ -204,14 +203,13 @@ textarea {
 .messages {
   grid-area: messages;
   padding: 18px 16px;
-  padding-bottom: calc(18px + var(--composer-height));
   overflow: auto;
   display: grid;
   gap: 12px;
   min-height: 0;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  scroll-padding-bottom: var(--composer-height);
+  scroll-padding-bottom: 18px;
 }
 
 .triageMain {
@@ -531,10 +529,6 @@ textarea {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  min-height: var(--composer-height);
 }
 
 .textarea {
@@ -979,6 +973,6 @@ textarea {
 
   .messages {
     padding: 12px 12px;
-    padding-bottom: calc(12px + var(--composer-height));
+    scroll-padding-bottom: 12px;
   }
 }
