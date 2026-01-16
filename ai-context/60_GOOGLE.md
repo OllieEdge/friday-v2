@@ -7,6 +7,15 @@ Friday v2 supports connecting **two Google accounts**:
 
 Once connected, Friday can make authenticated Google API calls via a **generic HTTP tool**, rather than hardcoding Gmail/Calendar logic in the server.
 
+## GCP access (try-first posture)
+
+- Friday can attempt **GCP API calls** via the Google HTTP tool once OAuth scopes include `cloud-platform`.
+- Default stance: **try the API call first**. If access is denied or a service is disabled, explain what needs enabling/permission, then retry after the user fixes it.
+
+## YouTube metadata (internal API)
+
+- For YouTube durations/metadata, Friday can call the internal `youtube/get-video-by-id` API when given a `videoId`.
+
 ## Env config (Google OAuth)
 
 Set these in `friday-v2/.env` on the host:
