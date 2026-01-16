@@ -1,7 +1,7 @@
 import { Ban, CheckCircle2, Circle, Inbox, ListTodo, RotateCcw } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { Chat, Message, TriageItem, TriageItemsResponse } from "../api/types";
+import type { Chat, Message, PersonAlias, ResolveAliasesResponse, TriageItem, TriageItemsResponse, UpsertAliasResponse } from "../api/types";
 import { MessageBubble } from "./MessageBubble";
 import { Markdown } from "./Markdown";
 
@@ -68,6 +68,10 @@ export function TriagePage({
   const [rawCompleted, setRawCompleted] = useState<TriageItem[]>([]);
   const [selected, setSelected] = useState<TriageItem | null>(null);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [aliasMap, setAliasMap] = useState<Record<string, PersonAlias>>({});
+  const [aliasName, setAliasName] = useState("");
+  const [aliasUserId, setAliasUserId] = useState("");
+  const [aliasSaving, setAliasSaving] = useState(false);
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
@@ -94,6 +98,7 @@ export function TriagePage({
     setRawQuickReads(qr.items);
     setRawNextActions(na.items);
     setRawCompleted(done.items);
+    void refreshAliases([...qr.items, ...na.items, ...done.items]);
   }
 
   const quickReads = useMemo(
@@ -128,6 +133,30 @@ export function TriagePage({
     setFeedbackReason("");
     setFeedbackOutcome("");
     setFeedbackNotes("");
+  }
+
+  async function refreshAliases(items: TriageItem[]) {
+    const spaceIds = Array.from(
+      new Set(
+        items
+          .map((it) => it.source)
+          .filter((src) => src && src.provider === "gchat" && src.space)
+          .map((src) => String(src.space)),
+      ),
+    );
+    if (spaceIds.length === 0) {
+      setAliasMap({});
+      return;
+    }
+    const res = await api<ResolveAliasesResponse>("/api/people/aliases/resolve", {
+      method: "POST",
+      body: JSON.stringify({ provider: "gchat", spaceIds }),
+    });
+    const next: Record<string, PersonAlias> = {};
+    for (const alias of res.aliases || []) {
+      next[alias.spaceId] = alias;
+    }
+    setAliasMap(next);
   }
 
   async function setItemStatus(item: TriageItem, status: "open" | "completed" | "dismissed") {
@@ -255,6 +284,49 @@ export function TriagePage({
     return () => clearInterval(t);
   }, []);
 
+  const selectedSpace = selected?.source?.provider === "gchat" ? String(selected?.source?.space || "") : "";
+  const selectedAlias = selectedSpace ? aliasMap[selectedSpace] : null;
+
+  useEffect(() => {
+    if (!selectedSpace) {
+      setAliasName("");
+      setAliasUserId("");
+      return;
+    }
+    setAliasName(selectedAlias?.displayName || "");
+    setAliasUserId(selectedAlias?.providerUserId || "");
+  }, [selectedSpace, selectedAlias?.displayName, selectedAlias?.providerUserId]);
+
+  async function saveAlias() {
+    if (!selectedSpace) return;
+    const name = aliasName.trim();
+    if (!name) return;
+    setAliasSaving(true);
+    try {
+      const res = await api<UpsertAliasResponse>("/api/people/aliases", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "gchat",
+          spaceId: selectedSpace,
+          displayName: name,
+          providerUserId: aliasUserId.trim() || null,
+        }),
+      });
+      setAliasMap((prev) => ({ ...prev, [selectedSpace]: res.alias }));
+    } finally {
+      setAliasSaving(false);
+    }
+  }
+
+  function displayTitle(item: TriageItem) {
+    const src = item.source;
+    if (src?.provider === "gchat" && src?.space) {
+      const alias = aliasMap[String(src.space)];
+      if (alias?.displayName) return `Chat: ${alias.displayName}`;
+    }
+    return item.title;
+  }
+
   const selectedHeader = useMemo(() => {
     if (!selected) return null;
     const badge =
@@ -270,7 +342,7 @@ export function TriagePage({
         <div className="row wrap">
           <div style={{ display: "grid", gap: 4 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ fontWeight: 800 }}>{selected.title}</div>
+              <div style={{ fontWeight: 800 }}>{displayTitle(selected)}</div>
               {badge}
               {typeof selected.priority === "number" ? <span className="pill">p{selected.priority}</span> : null}
               {conf ? <span className={`pill pillConfidence ${confClass}`}>{conf}</span> : null}
@@ -337,7 +409,7 @@ export function TriagePage({
               quickReads.map((it) => (
                 <button key={it.id} className={`triageItem${selected?.id === it.id ? " active" : ""}`} onClick={() => selectItem(it)}>
                   <div className="triageItemTitleRow">
-                    <div className="triageItemTitle">{it.title}</div>
+                    <div className="triageItemTitle">{displayTitle(it)}</div>
                     <div className="triageItemBadges">
                       {typeof it.priority === "number" ? <span className="pill">p{it.priority}</span> : null}
                       {confidenceLabel(it) ? (
@@ -375,7 +447,7 @@ export function TriagePage({
               nextActions.map((it) => (
                 <button key={it.id} className={`triageItem${selected?.id === it.id ? " active" : ""}`} onClick={() => selectItem(it)}>
                   <div className="triageItemTitleRow">
-                    <div className="triageItemTitle">{it.title}</div>
+                    <div className="triageItemTitle">{displayTitle(it)}</div>
                     <div className="triageItemBadges">
                       {typeof it.priority === "number" ? <span className="pill">p{it.priority}</span> : null}
                       {confidenceLabel(it) ? (
@@ -413,7 +485,7 @@ export function TriagePage({
               completed.map((it) => (
                 <button key={it.id} className={`triageItem${selected?.id === it.id ? " active" : ""}`} onClick={() => selectItem(it)}>
                   <div className="triageItemTitleRow">
-                    <div className="triageItemTitle">{it.title}</div>
+                    <div className="triageItemTitle">{displayTitle(it)}</div>
                     <div className="triageItemBadges">
                       <span className="pill">{it.kind === "next_action" ? "action" : "read"}</span>
                       {typeof it.priority === "number" ? <span className="pill">p{it.priority}</span> : null}
@@ -491,6 +563,34 @@ export function TriagePage({
           {selected ? (
             <>
               {selectedHeader}
+              {selectedSpace ? (
+                <>
+                  <div className="settingsDivider" />
+                  <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>Direct chat contact</div>
+                  <div className="muted">Set a friendly name for this direct message space.</div>
+                  <div className="row wrap">
+                    <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
+                      <div className="muted">Contact name</div>
+                      <input className="input" value={aliasName} onChange={(e) => setAliasName(e.target.value)} placeholder="Oscar Frost" />
+                    </label>
+                    <label style={{ display: "grid", gap: 6, minWidth: 240 }}>
+                      <div className="muted">User id (optional)</div>
+                      <input
+                        className="input"
+                        value={aliasUserId}
+                        onChange={(e) => setAliasUserId(e.target.value)}
+                        placeholder="users/12345678901234567890"
+                      />
+                    </label>
+                    <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
+                      <button className="btn secondary" onClick={() => void saveAlias()} disabled={aliasSaving || !aliasName.trim()}>
+                        {aliasSaving ? "Saving..." : "Save name"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="muted">Space: {selectedSpace}</div>
+                </>
+              ) : null}
               <div className="settingsDivider" />
               <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>
                 <Circle size={14} /> Thread

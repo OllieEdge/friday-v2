@@ -216,6 +216,25 @@ export type TriageItemsResponse = {
   items: TriageItem[];
 };
 
+export type PersonAlias = {
+  provider: string;
+  spaceId: string;
+  personId: string;
+  displayName: string;
+  providerUserId: string | null;
+  identityLabel: string | null;
+};
+
+export type ResolveAliasesResponse = {
+  ok: true;
+  aliases: PersonAlias[];
+};
+
+export type UpsertAliasResponse = {
+  ok: true;
+  alias: PersonAlias;
+};
+
 export type RunbookSummary = {
   id: string;
   title: string;
