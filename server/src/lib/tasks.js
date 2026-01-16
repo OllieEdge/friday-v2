@@ -97,7 +97,19 @@ function createTaskStore({ tasksDb }) {
     return tasksDb.updateInput({ taskId, input });
   }
 
-  return { create, get, updateInput, setCancel, emit, attachSse, cancel, finish };
+  function setStatus({ taskId, status, startedAt, completedAt }) {
+    return tasksDb.setStatus({ taskId, status, startedAt, completedAt });
+  }
+
+  function listRecent({ kind, limit }) {
+    return tasksDb.listRecent({ kind, limit });
+  }
+
+  function listByStatus({ kind, status, limit }) {
+    return tasksDb.listByStatus({ kind, status, limit });
+  }
+
+  return { create, get, updateInput, setStatus, listRecent, listByStatus, setCancel, emit, attachSse, cancel, finish };
 }
 
 module.exports = { createTaskStore };

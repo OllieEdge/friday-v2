@@ -2,10 +2,11 @@ import { ChevronLeft, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import type { CodexAccountsResponse, ContextMetrics } from "../api/types";
 import { AccountsPanel } from "./accounts/AccountsPanel";
+import { PmPanel } from "./pm/PmPanel";
 import { ScheduledPanel } from "./runbooks/ScheduledPanel";
 import { SecurityPanel } from "./security/SecurityPanel";
 
-type Section = "accounts" | "scheduled" | "security";
+type Section = "accounts" | "scheduled" | "pm" | "security";
 
 export function SettingsPage({
   onClose,
@@ -25,6 +26,7 @@ export function SettingsPage({
   const title = useMemo(() => {
     if (section === "accounts") return "Accounts";
     if (section === "scheduled") return "Scheduled";
+    if (section === "pm") return "PM";
     if (section === "security") return "Security";
     return "Settings";
   }, [section]);
@@ -59,6 +61,12 @@ export function SettingsPage({
               Scheduled
             </button>
             <button
+              className={`settingsNavItem${section === "pm" ? " active" : ""}`}
+              onClick={() => setSection("pm")}
+            >
+              PM
+            </button>
+            <button
               className={`settingsNavItem${section === "security" ? " active" : ""}`}
               onClick={() => setSection("security")}
             >
@@ -71,6 +79,8 @@ export function SettingsPage({
               <AccountsPanel accounts={accounts} refreshAccounts={refreshAccounts} contextMetrics={contextMetrics} />
             ) : section === "scheduled" ? (
               <ScheduledPanel />
+            ) : section === "pm" ? (
+              <PmPanel />
             ) : section === "security" ? (
               <SecurityPanel onLoggedOut={onLoggedOut} />
             ) : null}

@@ -21,6 +21,7 @@ const { createTriageQueries } = require("./db/queries/triage");
 const { createRunbookQueries } = require("./db/queries/runbooks");
 const { createAuthQueries } = require("./db/queries/auth");
 const { createTasksQueries } = require("./db/queries/tasks");
+const { createPmProjectsQueries } = require("./db/queries/pm-projects");
 
 const { registerHealth } = require("./routes/health");
 const { registerContext } = require("./routes/context");
@@ -34,6 +35,10 @@ const { registerModels } = require("./routes/models");
 const { registerTools } = require("./routes/tools");
 const { registerTriage } = require("./routes/triage");
 const { registerRunbooks } = require("./routes/runbooks");
+const { registerProviders } = require("./routes/providers");
+const { registerPm } = require("./routes/pm");
+const { registerPmProjects } = require("./routes/pm-projects");
+const { registerSummarize } = require("./routes/summarize");
 const { registerAuth, requireUser } = require("./routes/auth");
 const { runAssistant } = require("./lib/runner");
 const { listRunbooks, runRunbookOnce, updateRunbookFile } = require("./lib/runbook-runner");
@@ -54,6 +59,7 @@ const triage = createTriageQueries(db);
 const runbooksDb = createRunbookQueries(db);
 const auth = createAuthQueries(db);
 const tasksDb = createTasksQueries(db);
+const pmProjects = createPmProjectsQueries(db);
 const tasks = createTaskStore({ tasksDb });
 
 function loadContext() {
@@ -79,6 +85,7 @@ function getAssistantRunnerPrefs() {
     openai: {
       model: settings.get("openai_model") || "",
       baseUrl: settings.get("openai_base_url") || "",
+      apiKey: settings.get("openai_api_key") || "",
     },
     vertex: {
       model: settings.get("vertex_model") || "",
@@ -86,6 +93,7 @@ function getAssistantRunnerPrefs() {
       location: envString("VERTEX_LOCATION", "europe-west2"),
       authMode: settings.get("vertex_auth_mode") || envString("VERTEX_AUTH_MODE", "") || "aws_secret",
       googleAccountKey: settings.get("vertex_google_account_key") || envString("VERTEX_GOOGLE_ACCOUNT_KEY", "work") || "work",
+      serviceAccountJson: settings.get("vertex_service_account_json") || "",
     },
   };
 }
@@ -108,9 +116,13 @@ registerTasks(router, { tasks });
   registerGoogleAccounts(router, { googleAccounts });
   registerMicrosoftAccounts(router, { microsoftAccounts });
 registerRunnerSettings(router, { settings });
+registerProviders(router, { settings });
 registerModels(router, { settings, googleAccounts });
 registerTools(router);
 registerTriage(router, { triage });
+registerPm(router, { tasks, settings });
+registerPmProjects(router, { pmProjects, chats, tasks, settings, googleAccounts });
+registerSummarize(router, { settings, googleAccounts });
 registerRunbooks(router, {
   runbooksDir: RUNBOOKS_DIR,
   runbooksDb,

@@ -324,6 +324,7 @@ async function getVertexContextCache({
   authMode,
   googleAccounts,
   googleAccountKey,
+  serviceAccountJson,
 }) {
   if (!normalizeBoolean(envString("VERTEX_CONTEXT_CACHE", ""))) return null;
   const sys = normalizeString(systemText);
@@ -338,7 +339,7 @@ async function getVertexContextCache({
   if (cached?.name && cached?.expiresAtMs && cached.expiresAtMs - Date.now() > 60_000) return cached.name;
 
   const token =
-    normalizeString(accessToken) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey }));
+    normalizeString(accessToken) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey, serviceAccountJson }));
   const ttlSeconds = resolveCacheTtlSeconds();
   const created = await createVertexCachedContent({
     projectId: resolvedProjectId,
@@ -363,6 +364,7 @@ async function vertexGenerateText({
   authMode,
   googleAccounts,
   googleAccountKey,
+  serviceAccountJson,
   accessToken: accessTokenOverride,
 }) {
   const resolvedProjectId = normalizeString(projectId) || envString("VERTEX_PROJECT_ID", "tmg-product-innovation-prod");
@@ -370,7 +372,7 @@ async function vertexGenerateText({
   const resolvedModel = normalizeString(model) || envString("VERTEX_MODEL", "gemini-2.0-flash");
   if (!resolvedProjectId) throw new Error("Vertex project not set");
 
-  const accessToken = normalizeString(accessTokenOverride) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey }));
+  const accessToken = normalizeString(accessTokenOverride) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey, serviceAccountJson }));
 
   const url =
     `https://${resolvedLocation}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(resolvedProjectId)}` +
@@ -485,13 +487,14 @@ async function vertexGenerateWithTools({
   authMode,
   googleAccounts,
   googleAccountKey,
+  serviceAccountJson,
 }) {
   const resolvedProjectId = normalizeString(projectId) || envString("VERTEX_PROJECT_ID", "tmg-product-innovation-prod");
   const resolvedLocation = normalizeString(location) || envString("VERTEX_LOCATION", "europe-west2");
   const resolvedModel = normalizeString(model) || envString("VERTEX_MODEL", "gemini-2.0-flash");
   if (!resolvedProjectId) throw new Error("Vertex project not set");
 
-  const accessToken = await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey });
+  const accessToken = await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey, serviceAccountJson });
 
   const url =
     `https://${resolvedLocation}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(resolvedProjectId)}` +
@@ -553,6 +556,7 @@ async function runVertexChat({
   authMode,
   googleAccounts,
   googleAccountKey,
+  serviceAccountJson,
   toolHandler,
 }) {
   const systemText = normalizeString(system);
@@ -573,6 +577,7 @@ async function runVertexChat({
         authMode,
         googleAccounts,
         googleAccountKey,
+        serviceAccountJson,
       });
     } catch (err) {
       console.warn("[vertex] context cache create failed", err instanceof Error ? err.message : String(err));
@@ -615,6 +620,7 @@ async function runVertexChat({
       authMode,
       googleAccounts,
       googleAccountKey,
+      serviceAccountJson,
     });
     totalUsage = sumUsage(totalUsage, result.usage);
 
@@ -646,6 +652,7 @@ async function runVertexChat({
         authMode,
         googleAccounts,
         googleAccountKey,
+        serviceAccountJson,
       });
       totalUsage = sumUsage(totalUsage, result.usage);
       iterations += 1;
@@ -664,19 +671,20 @@ async function runVertexChat({
       authMode,
       googleAccounts,
       googleAccountKey,
+      serviceAccountJson,
     });
   }
 
-  return vertexGenerateText({ projectId, location, model, prompt: fullPrompt, authMode, googleAccounts, googleAccountKey });
+  return vertexGenerateText({ projectId, location, model, prompt: fullPrompt, authMode, googleAccounts, googleAccountKey, serviceAccountJson });
 }
 
-async function vertexProbeModelIds({ projectId, location, modelIds, authMode, googleAccounts, googleAccountKey, accessToken: accessTokenOverride }) {
+async function vertexProbeModelIds({ projectId, location, modelIds, authMode, googleAccounts, googleAccountKey, serviceAccountJson, accessToken: accessTokenOverride }) {
   const resolvedProjectId = normalizeString(projectId) || envString("VERTEX_PROJECT_ID", "tmg-product-innovation-prod");
   const resolvedLocation = normalizeString(location) || envString("VERTEX_LOCATION", "europe-west2");
   const ids = Array.isArray(modelIds) ? modelIds.map((x) => String(x || "").trim()).filter(Boolean) : [];
 
   const out = [];
-  const accessToken = normalizeString(accessTokenOverride) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey }));
+  const accessToken = normalizeString(accessTokenOverride) || (await getVertexAccessToken({ authMode, googleAccounts, googleAccountKey, serviceAccountJson }));
 
   for (const id of ids) {
     const url =

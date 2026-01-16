@@ -148,6 +148,7 @@ type MessageBubbleProps = {
 
 export function MessageBubble({ message, eventsLimit = 400 }: MessageBubbleProps) {
   const run = message.meta?.run;
+  const roleLabel = String(message.meta?.roleLabel || message.role || "");
   const events = Array.isArray(message.events) ? message.events : [];
   const isRunning = run?.status === "running";
 
@@ -180,7 +181,7 @@ export function MessageBubble({ message, eventsLimit = 400 }: MessageBubbleProps
   return (
     <div className={`msg ${message.role}`}>
       <div className="msgRoleRow">
-        <div className="msgRole">{message.role}</div>
+        <div className="msgRole">{roleLabel}</div>
         {run ? (
           <div className={`runPill ${run.status}`}>
             {runPill(run)}

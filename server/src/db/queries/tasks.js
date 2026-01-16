@@ -75,6 +75,40 @@ function createTasksQueries(db) {
     return rows.map((r) => ({ id: r.id, event: safeJsonParse(r.eventJson) })).filter((r) => r.event);
   }
 
+  function listRecent({ kind, limit = 20 }) {
+    const rows = db
+      .prepare(
+        "SELECT id, kind, status, input_json AS inputJson, created_at AS createdAt, updated_at AS updatedAt, started_at AS startedAt, completed_at AS completedAt, " +
+          "(SELECT event_json FROM task_events WHERE task_id = tasks.id ORDER BY id DESC LIMIT 1) AS lastEventJson " +
+          "FROM tasks WHERE kind = ? ORDER BY created_at DESC LIMIT ?;",
+      )
+      .all(String(kind || "task"), Math.max(1, Math.min(200, Number(limit) || 20)));
+
+    return rows.map((row) => ({
+      ...row,
+      input: row.inputJson ? safeJsonParse(row.inputJson) : null,
+      lastEvent: row.lastEventJson ? safeJsonParse(row.lastEventJson) : null,
+    }));
+  }
+
+
+  function listByStatus({ kind, status, limit = 20 }) {
+    const rows = db
+      .prepare(
+        "SELECT id, kind, status, input_json AS inputJson, created_at AS createdAt, updated_at AS updatedAt, started_at AS startedAt, completed_at AS completedAt, " +
+          "(SELECT event_json FROM task_events WHERE task_id = tasks.id ORDER BY id DESC LIMIT 1) AS lastEventJson " +
+          "FROM tasks WHERE kind = ? AND status = ? ORDER BY created_at DESC LIMIT ?;",
+      )
+      .all(String(kind || "task"), String(status || "queued"), Math.max(1, Math.min(200, Number(limit) || 20)));
+
+    return rows.map((row) => ({
+      ...row,
+      input: row.inputJson ? safeJsonParse(row.inputJson) : null,
+      lastEvent: row.lastEventJson ? safeJsonParse(row.lastEventJson) : null,
+    }));
+  }
+
+
   function claimNextQueued({ kind }) {
     const now = nowIso();
     db.exec("BEGIN IMMEDIATE;");
@@ -101,7 +135,7 @@ function createTasksQueries(db) {
     }
   }
 
-  return { create, get, setStatus, updateInput, appendEvent, listEvents, claimNextQueued };
+  return { create, get, setStatus, updateInput, appendEvent, listEvents, listRecent, listByStatus, claimNextQueued };
 }
 
 module.exports = { createTasksQueries };

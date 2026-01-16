@@ -68,6 +68,12 @@ export type CodexAccountsResponse = {
 export type TaskEvent =
   | { type: "log"; stream: "stdout" | "stderr"; line: string }
   | { type: "device"; url: string; code: string }
+  | { type: "status"; stage: string }
+  | { type: "trello_card"; url: string; board?: string; list?: string }
+  | { type: "command_result"; ok: boolean; output?: string; error?: string; exitCode?: number | null }
+  | { type: "assistant_message"; message: Message }
+  | { type: "usage"; usage: any; costUsd?: number | null }
+  | { type: "error"; message: string }
   | { type: "done"; ok: boolean; exitCode: number | null }
   | { type: "canceled"; reason: string };
 
@@ -133,6 +139,48 @@ export type RunnerSettingsResponse = {
   effective: { runner: string; source: "env" | "settings" };
   env: { FRIDAY_RUNNER: string | null };
   caps?: { vertexCodeExecution?: boolean; vertexToolExec?: boolean };
+};
+
+export type PmSettings = {
+  trelloBoard: string;
+  trelloList: string;
+};
+
+export type PmSettingsResponse = {
+  ok: true;
+  settings: PmSettings;
+};
+
+export type PmRequestResponse = {
+  ok: true;
+  taskId: string;
+};
+
+export type PmTaskSummary = {
+  id: string;
+  kind: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  input: any;
+  lastEvent?: TaskEvent | null;
+};
+
+export type PmRequestsResponse = {
+  ok: true;
+  items: PmTaskSummary[];
+};
+
+export type PmCommandsResponse = {
+  ok: true;
+  items: PmTaskSummary[];
+};
+
+export type PmCommandRequest = {
+  ok: true;
+  taskId: string;
 };
 
 export type VertexModelProbeResult = { id: string; ok: boolean; error?: string };
@@ -215,4 +263,73 @@ export type PasskeysResponse = {
   ok: true;
   user: AuthUser;
   passkeys: Passkey[];
+};
+
+
+export type PmProject = {
+  id: string;
+  chatId: string;
+  title: string;
+  summary?: string | null;
+  trelloCardUrl?: string | null;
+  trelloCardId?: string | null;
+  trelloBoardId?: string | null;
+  trelloListId?: string | null;
+  sizeLabel?: string | null;
+  sizeEstimate?: string | null;
+  sizeRisks?: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastActivityAt?: string | null;
+};
+
+export type PmProjectWorker = {
+  projectId: string;
+  workerId: string;
+  lane?: string | null;
+  lastActivityAt: string;
+};
+
+export type PmProjectsResponse = {
+  ok: true;
+  projects: Array<PmProject & { workers?: PmProjectWorker[] }>;
+};
+
+export type PmProjectResponse = {
+  ok: true;
+  project: PmProject;
+  chat: Chat | null;
+  workers: PmProjectWorker[];
+};
+
+export type PmProjectCreateResponse = {
+  ok: true;
+  project: PmProject;
+  chat: Chat;
+};
+
+export type PmProjectMessageResponse = {
+  ok: true;
+  taskId: string;
+  userMessage: Message;
+  assistantMessage: Message;
+};
+
+
+export type PmProjectDeleteResponse = {
+  ok: true;
+};
+export type PmTrelloBoard = { id: string; name: string; url: string; shortLink?: string };
+export type PmTrelloList = { id: string; name: string };
+export type PmTrelloCard = { id: string; name: string; url: string; idBoard?: string; idList?: string };
+
+export type PmTrelloBoardsResponse = { ok: true; boards: PmTrelloBoard[] };
+export type PmTrelloListsResponse = { ok: true; lists: PmTrelloList[] };
+export type PmTrelloSearchResponse = { ok: true; cards: PmTrelloCard[] };
+
+export type PmSizingResponse = {
+  ok: true;
+  project: PmProject;
+  sizing: { ok: true; sizeLabel: string; timeEstimate: string; risks: string[] };
 };

@@ -3,25 +3,34 @@ import { test, expect } from "@playwright/test";
 const baseURL = process.env.FRIDAY_E2E_BASE_URL || "http://127.0.0.1:3334";
 const cookieName = process.env.FRIDAY_E2E_COOKIE_NAME || "friday_session";
 const cookieValue = process.env.FRIDAY_E2E_COOKIE_VALUE || "";
+const bypassToken = process.env.FRIDAY_E2E_BYPASS_TOKEN || "";
 test.describe("chat ui", () => {
-  test.skip(!cookieValue, "Set FRIDAY_E2E_COOKIE_VALUE to a valid session cookie.");
+  test.skip(!cookieValue && !bypassToken, "Set FRIDAY_E2E_COOKIE_VALUE or FRIDAY_E2E_BYPASS_TOKEN.");
 
   function authHeaders() {
-    return { Cookie: `${cookieName}=${cookieValue}` };
+    if (cookieValue) return { Cookie: `${cookieName}=${cookieValue}` };
+    if (bypassToken) return { "x-friday-test-bypass": bypassToken };
+    return {};
   }
 
   async function authedPage(page: any) {
     const url = new URL(baseURL);
-    await page.context().addCookies([
-      {
-        name: cookieName,
-        value: cookieValue,
-        domain: url.hostname,
-        path: "/",
-        httpOnly: true,
-        secure: url.protocol === "https:",
-      },
-    ]);
+    if (cookieValue) {
+      await page.context().addCookies([
+        {
+          name: cookieName,
+          value: cookieValue,
+          domain: url.hostname,
+          path: "/",
+          httpOnly: true,
+          secure: url.protocol === "https:",
+        },
+      ]);
+      return;
+    }
+    if (bypassToken) {
+      await page.setExtraHTTPHeaders({ "x-friday-test-bypass": bypassToken });
+    }
   }
 
   function apiUrl(path: string) {

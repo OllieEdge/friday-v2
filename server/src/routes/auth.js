@@ -54,7 +54,40 @@ function getSessionTtlDays() {
   return envNumber("SESSION_TTL_DAYS", 30);
 }
 
+
+function normalizeText(value) {
+  return String(value ?? "").trim();
+}
+
+function isTruthy(value) {
+  const v = normalizeText(value).toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function getTestBypassToken() {
+  return normalizeText(envString("FRIDAY_TEST_BYPASS_TOKEN", ""));
+}
+
+function testBypassEnabled() {
+  return isTruthy(envString("FRIDAY_TEST_BYPASS_ENABLED", ""));
+}
+
+function testBypassUser({ req, auth }) {
+  if (!testBypassEnabled()) return null;
+  const token = normalizeText(req.headers?.["x-friday-test-bypass"] || "");
+  const expected = getTestBypassToken();
+  if (!token || !expected || token !== expected) return null;
+  let user = auth.getFirstUser();
+  if (!user) {
+    user = auth.createUser({ id: randomId(), label: "Test User" });
+  }
+  if (!user) return null;
+  return { session: { id: "test-bypass", userId: user.id }, user };
+}
+
 async function requireUser({ req, auth }) {
+  const bypass = testBypassUser({ req, auth });
+  if (bypass) return bypass;
   const cookies = parseCookies(req);
   const cookieName = getCookieName();
   const sid = cookies[cookieName];

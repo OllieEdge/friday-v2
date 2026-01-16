@@ -48,6 +48,17 @@ function createChatsQueries(db) {
     return getChat(chatId);
   }
 
+  function updateChatTitle({ chatId, title }) {
+    const now = nowIso();
+    db.prepare("UPDATE chats SET title = ?, updated_at = ? WHERE id = ?;").run(String(title || ""), now, chatId);
+    return getChat(chatId);
+  }
+
+  function deleteChat({ chatId }) {
+    const result = db.prepare("DELETE FROM chats WHERE id = ?;").run(chatId);
+    return result.changes > 0;
+  }
+
   function appendMessage({ chatId, role, content, meta }) {
     const exists = db.prepare("SELECT 1 FROM chats WHERE id = ?;").get(chatId);
     if (!exists) return null;
@@ -92,7 +103,17 @@ function createChatsQueries(db) {
     return rows.map((r) => safeJsonParse(r.eventJson)).filter(Boolean);
   }
 
-  return { listChats, getChat, createChat, setChatHidden, appendMessage, updateMessage, appendMessageEvent, listMessageEvents };
+  return {
+    listChats,
+    getChat,
+    createChat,
+    setChatHidden,
+    updateChatTitle,
+    appendMessage,
+    updateMessage,
+    appendMessageEvent,
+    listMessageEvents,
+  };
 }
 
 module.exports = { createChatsQueries };

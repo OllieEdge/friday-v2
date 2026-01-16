@@ -10,7 +10,8 @@
     "dev:server": "npm -w server run dev",
     "build": "npm -w apps/web run build",
     "start": "npm -w server run start",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:unit": "node --test server/test/*.test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1"

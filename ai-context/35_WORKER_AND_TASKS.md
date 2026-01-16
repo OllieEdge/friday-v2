@@ -45,3 +45,15 @@ If you’re adding a new integration (e.g. Microsoft), start by:
    - the task continues and completes
    - the assistant message content updates in the chat
    - `/api/tasks/:taskId` still exists and ends `ok`/`error`
+
+## PM runner notes
+
+- PM chats run in the worker via `pm_chat_run` tasks (not in the server process).
+- The PM model can emit a `pm_actions` JSON block to trigger Trello updates, checklist changes, title refreshes, and activity timeline entries.
+- Treat `pm_actions` as structured output only; always include a human-readable response alongside it.
+
+## PM context resolution (workers)
+
+- Workers can resolve a PM project by Trello card URL or PM title via `GET /api/pm/projects/resolve`.
+- Query params: `cardUrl` (preferred) or `title`. Returns `project` when exact match is found, otherwise `candidates`.
+- After resolving `project.id`, send messages to the PM chat via `POST /api/pm/projects/:projectId/messages/stream` with `workerId` + `lane`.

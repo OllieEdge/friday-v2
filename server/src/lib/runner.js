@@ -93,6 +93,7 @@ async function runOpenAiWithPrefs({ context, chat, prefs }) {
     messages: [{ role: "system", content: system }, ...chatMessages],
     model: prefs?.openai?.model || "",
     baseUrl: prefs?.openai?.baseUrl || "",
+    apiKey: prefs?.openai?.apiKey || "",
   });
   return { runner: "openai", content: result.content, usage: result.usage };
 }

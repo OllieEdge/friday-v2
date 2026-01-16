@@ -1,4 +1,4 @@
-import { LayoutList, Menu, MessageSquare, Plus, Settings2, X } from "lucide-react";
+import { LayoutList, ListTodo, Menu, MessageSquare, Plus, Settings2, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type {
@@ -15,6 +15,7 @@ import { AuthOverlay } from "./AuthOverlay";
 import { MessageBubble } from "./MessageBubble";
 import { SettingsPage } from "./SettingsPage";
 import { TriagePage } from "./TriagePage";
+import { PmWorkspace } from "./pm/PmWorkspace";
 
 type ChatsListResponse = { ok: true; chats: ChatSummary[] };
 type ChatResponse = { ok: true; chat: Chat };
@@ -31,7 +32,7 @@ export function App() {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "triage">("chat");
+  const [view, setView] = useState<"chat" | "triage" | "pm">("chat");
 
   const [contextVisible, setContextVisible] = useState(false);
   const [context, setContext] = useState<ContextBundle | null>(null);
@@ -428,7 +429,7 @@ export function App() {
   }, [lastUsage]);
 
   return (
-    <div className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" ? " triageMode" : ""}`}>
+    <div className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" || view === "pm" ? " triageMode" : ""}`}>
       {authStatus && !authStatus.authenticated ? (
         <AuthOverlay
           status={authStatus}
@@ -478,7 +479,7 @@ export function App() {
                   {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
               ) : null}
-              <div className="chatTitle">{view === "triage" ? "Triage" : activeChat?.title || "Select a chat"}</div>
+              <div className="chatTitle">{view === "triage" ? "Triage" : view === "pm" ? "PM" : activeChat?.title || "Select a chat"}</div>
             </div>
             <div className="activeAccount">
               {activeAccountLabel}
@@ -493,7 +494,7 @@ export function App() {
             ) : null}
           </div>
           <div className="topbarRight">
-            {view === "triage" ? (
+            {view === "triage" || view === "pm" ? (
               <button className="btn secondary" onClick={() => setView("chat")} title="Chats">
                 <MessageSquare size={16} />
                 Chats
@@ -509,6 +510,17 @@ export function App() {
             >
               <LayoutList size={16} />
               Triage
+            </button>
+            <button
+              className={`btn${view === "pm" ? " secondary" : ""}`}
+              onClick={() => {
+                setSidebarOpen(false);
+                setView("pm");
+              }}
+              title="PM"
+            >
+              <ListTodo size={16} />
+              PM
             </button>
             {view === "chat" ? (
               <button
@@ -561,9 +573,13 @@ export function App() {
               </button>
             </form>
           </>
-        ) : (
+        ) : view === "triage" ? (
           <section className="triageMain">
             <TriagePage onOpenChat={(chatId) => loadChat(chatId)} />
+          </section>
+        ) : (
+          <section className="triageMain">
+            <PmWorkspace />
           </section>
         )}
       </main>

@@ -31,3 +31,9 @@ Preferred CLI lives in:
 
 Auth is via env (`TRELLO_KEY`, `TRELLO_TOKEN`), and (optionally) `TRELLO_BOARD_ID`.
 
+
+## PM workflow notes
+
+- PM projects treat the Trello card as the primary source of truth.
+- PM updates should be meaningful (blockers, scope changes, failures, checklist progress).
+- Related cards must be recorded in a `## Related Cards` section on the parent card.
