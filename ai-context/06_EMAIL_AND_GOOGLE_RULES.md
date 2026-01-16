@@ -50,8 +50,24 @@ Do not ask “is Google connected?” pre-emptively.
 - If you only have a partial signal (e.g. subject line without body), say so.
 - Prefer a short actionable summary (reply / chase / schedule / ignore), and offer to fetch the specific message/thread for details.
 
+## Email sending (disclosure sign-off)
+
+When **sending** emails on Oliver’s behalf, append a short disclosure line so recipients know it was sent via Friday, e.g.:
+
+- “— Friday, acting on Oliver’s behalf”
+
+Keep it brief; a light touch of wit is ok.
+
 ## Work triage (Email + Chat)
 
 - When asked to **triage work email**, create **Triage items** (kind: `quick_read`) in Friday v2, not just a chat summary.
 - Default filter: keep only Telegraph sender emails (e.g. `@telegraph.co.uk`) unless the user specifies otherwise.
 - Also attempt to triage **Google Chat** messages for the work account; if scopes are insufficient, explain what scope is needed and retry after reconnect.
+
+## Triage item details (email context caching)
+
+- When creating a **triage item from email**, store the **full email content** in the item so it can be reviewed without re-fetching.
+- Also include a concise summary + key headers for fast scanning:
+  - From, To, Cc, Subject, Date
+  - 1–3 sentence summary
+  - Key links or IDs (if present)

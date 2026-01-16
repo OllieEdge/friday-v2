@@ -15,6 +15,7 @@ Once connected, Friday can make authenticated Google API calls via a **generic H
 ## YouTube metadata (internal API)
 
 - For YouTube durations/metadata, Friday can call the internal `youtube/get-video-by-id` API when given a `videoId`.
+- For allowlist changes or channel lookups, see `friday-v2/ai-context/66_YOUTUBE_CHANNEL_WORKFLOW.md`.
 
 ## Env config (Google OAuth)
 
