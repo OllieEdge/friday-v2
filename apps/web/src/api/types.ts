@@ -240,6 +240,19 @@ export type GchatSenderResponse = {
   sender: { senderUserId: string | null; senderDisplayName: string | null };
 };
 
+export type GchatThreadMessage = {
+  name: string | null;
+  createTime: string | null;
+  text: string;
+  sender: { name: string | null; displayName: string | null };
+  thread: string | null;
+};
+
+export type GchatThreadResponse = {
+  ok: true;
+  messages: GchatThreadMessage[];
+};
+
 export type RunbookSummary = {
   id: string;
   title: string;

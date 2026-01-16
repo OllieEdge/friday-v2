@@ -4,6 +4,8 @@ import { api } from "../api/client";
 import type {
   Chat,
   GchatSenderResponse,
+  GchatThreadMessage,
+  GchatThreadResponse,
   Message,
   PersonAlias,
   ResolveAliasesResponse,
@@ -83,6 +85,9 @@ export function TriagePage({
   const [aliasSaving, setAliasSaving] = useState(false);
   const [aliasLookupBusy, setAliasLookupBusy] = useState(false);
   const [lastSenderLookup, setLastSenderLookup] = useState("");
+  const [threadMessages, setThreadMessages] = useState<GchatThreadMessage[]>([]);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadError, setThreadError] = useState("");
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
@@ -328,6 +333,23 @@ export function TriagePage({
         setAliasLookupBusy(false);
       });
   }, [selectedSpace, selectedMessage, aliasUserId, selectedAlias?.providerUserId, aliasLookupBusy, lastSenderLookup]);
+
+  useEffect(() => {
+    if (!selectedSpace) {
+      setThreadMessages([]);
+      setThreadError("");
+      return;
+    }
+    setThreadLoading(true);
+    setThreadError("");
+    api<GchatThreadResponse>("/api/people/gchat/thread", {
+      method: "POST",
+      body: JSON.stringify({ space: selectedSpace, accountKey: "work", months: 3 }),
+    })
+      .then((res) => setThreadMessages(res.messages || []))
+      .catch((e) => setThreadError(String(e?.message || e)))
+      .finally(() => setThreadLoading(false));
+  }, [selectedSpace]);
 
   async function saveAlias() {
     if (!selectedSpace) return;
@@ -610,6 +632,7 @@ export function TriagePage({
                         placeholder="Contact Name"
                       />
                     </label>
+                    {aliasUserId ? <div className="muted" style={{ alignSelf: "flex-end" }}>User id: {aliasUserId}</div> : null}
                     <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
                       <button className="btn secondary" onClick={() => void saveAlias()} disabled={aliasSaving || !aliasName.trim()}>
                         {aliasSaving ? "Saving..." : "Save name"}
@@ -620,6 +643,35 @@ export function TriagePage({
                 </>
               ) : null}
               <div className="settingsDivider" />
+              {selectedSpace ? (
+                <>
+                  <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>
+                    <Circle size={14} /> Chat thread (last 3 months)
+                  </div>
+                  <div className="muted">Most recent direct messages from Google Chat.</div>
+                  <div className="settingsDivider" />
+                  {threadLoading ? (
+                    <div className="muted">Loading thread…</div>
+                  ) : threadError ? (
+                    <div className="muted">Thread error: {threadError}</div>
+                  ) : threadMessages.length ? (
+                    <div className="triageChat">
+                      {threadMessages.map((m) => (
+                        <div key={m.name || `${m.createTime}-${m.text.slice(0, 12)}`} className="messageBubble">
+                          <div className="messageMeta">
+                            {m.sender?.displayName || m.sender?.name || "Unknown"} ·{" "}
+                            {m.createTime ? new Date(m.createTime).toLocaleString() : "unknown time"}
+                          </div>
+                          <div className="messageText">{m.text || "(no text)"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="muted">No recent messages in the last 3 months.</div>
+                  )}
+                  <div className="settingsDivider" />
+                </>
+              ) : null}
               <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>
                 <Circle size={14} /> Thread
               </div>

@@ -2,7 +2,7 @@ const { readJson } = require("../http/body");
 const { sendJson } = require("../http/respond");
 const { requireGoogleConfig, exchangeRefreshTokenForAccessToken } = require("../lib/google");
 
-async function fetchChatSender({ messageName, googleAccounts, accountKey = "work" }) {
+async function getAccessToken({ googleAccounts, accountKey = "work" }) {
   const acct = googleAccounts.get(accountKey);
   if (!acct?.refreshToken) {
     const err = new Error(`Google account not connected: ${accountKey}`);
@@ -21,6 +21,11 @@ async function fetchChatSender({ messageName, googleAccounts, accountKey = "work
     err.statusCode = 400;
     throw err;
   }
+  return accessToken;
+}
+
+async function fetchChatSender({ messageName, googleAccounts, accountKey = "work" }) {
+  const accessToken = await getAccessToken({ googleAccounts, accountKey });
   const url = `https://chat.googleapis.com/v1/${messageName}?readMask=sender`;
   const res = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
   const txt = await res.text();
@@ -40,6 +45,62 @@ async function fetchChatSender({ messageName, googleAccounts, accountKey = "work
     senderUserId: sender?.name || null,
     senderDisplayName: sender?.displayName || null,
   };
+}
+
+async function fetchChatThread({ spaceId, googleAccounts, accountKey = "work", months = 3 }) {
+  const accessToken = await getAccessToken({ googleAccounts, accountKey });
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - Number(months || 3));
+  const cutoffMs = cutoff.getTime();
+  const messages = [];
+  let pageToken = null;
+  let keepGoing = true;
+
+  while (keepGoing) {
+    const qs = new URLSearchParams({
+      pageSize: "100",
+      orderBy: "CREATE_TIME_DESC",
+      readMask: "name,createTime,text,sender,thread",
+    });
+    if (pageToken) qs.set("pageToken", pageToken);
+    const url = `https://chat.googleapis.com/v1/${spaceId}/messages?${qs.toString()}`;
+    const res = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+    const txt = await res.text();
+    let json = null;
+    try {
+      json = JSON.parse(txt);
+    } catch {
+      json = null;
+    }
+    if (!res.ok) {
+      const err = new Error(json?.error?.message || txt || `HTTP ${res.status}`);
+      err.statusCode = res.status;
+      throw err;
+    }
+    const batch = Array.isArray(json?.messages) ? json.messages : [];
+    for (const msg of batch) {
+      const t = Date.parse(msg?.createTime || "");
+      if (!t || t < cutoffMs) {
+        keepGoing = false;
+        break;
+      }
+      messages.push(msg);
+    }
+    pageToken = json?.nextPageToken || null;
+    if (!pageToken) break;
+  }
+
+  messages.reverse();
+  return messages.map((msg) => ({
+    name: msg?.name || null,
+    createTime: msg?.createTime || null,
+    text: msg?.text || "",
+    sender: {
+      name: msg?.sender?.name || null,
+      displayName: msg?.sender?.displayName || null,
+    },
+    thread: msg?.thread?.name || null,
+  }));
 }
 
 function registerPeople(router, { people, googleAccounts }) {
@@ -80,6 +141,21 @@ function registerPeople(router, { people, googleAccounts }) {
       return sendJson(res, 200, { ok: true, sender });
     } catch (e) {
       return sendJson(res, e.statusCode || 500, { ok: false, error: "sender_lookup_failed", message: String(e?.message || e) });
+    }
+  });
+
+  router.add("POST", "/api/people/gchat/thread", async (req, res) => {
+    if (!googleAccounts) return sendJson(res, 400, { ok: false, error: "google_unavailable" });
+    const body = (await readJson(req)) || {};
+    const space = String(body?.space || "").trim();
+    const accountKey = String(body?.accountKey || "work").trim() || "work";
+    const months = Number(body?.months || 3);
+    if (!space) return sendJson(res, 400, { ok: false, error: "missing_space" });
+    try {
+      const messages = await fetchChatThread({ spaceId: space, googleAccounts, accountKey, months });
+      return sendJson(res, 200, { ok: true, messages });
+    } catch (e) {
+      return sendJson(res, e.statusCode || 500, { ok: false, error: "thread_lookup_failed", message: String(e?.message || e) });
     }
   });
 }
