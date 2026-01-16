@@ -49,3 +49,9 @@ Do not ask “is Google connected?” pre-emptively.
 - Never claim you’ve read email unless you actually fetched it via the Google tool.
 - If you only have a partial signal (e.g. subject line without body), say so.
 - Prefer a short actionable summary (reply / chase / schedule / ignore), and offer to fetch the specific message/thread for details.
+
+## Work triage (Email + Chat)
+
+- When asked to **triage work email**, create **Triage items** (kind: `quick_read`) in Friday v2, not just a chat summary.
+- Default filter: keep only Telegraph sender emails (e.g. `@telegraph.co.uk`) unless the user specifies otherwise.
+- Also attempt to triage **Google Chat** messages for the work account; if scopes are insufficient, explain what scope is needed and retry after reconnect.
