@@ -113,7 +113,7 @@ registerMicrosoftAccounts(router, { microsoftAccounts });
 registerRunnerSettings(router, { settings });
 registerModels(router, { settings, googleAccounts });
 registerTools(router);
-registerPeople(router, { people });
+registerPeople(router, { people, googleAccounts });
 registerTriage(router, { triage });
 registerRunbooks(router, {
   runbooksDir: RUNBOOKS_DIR,

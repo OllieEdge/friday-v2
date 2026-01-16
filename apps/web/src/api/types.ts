@@ -235,6 +235,11 @@ export type UpsertAliasResponse = {
   alias: PersonAlias;
 };
 
+export type GchatSenderResponse = {
+  ok: true;
+  sender: { senderUserId: string | null; senderDisplayName: string | null };
+};
+
 export type RunbookSummary = {
   id: string;
   title: string;

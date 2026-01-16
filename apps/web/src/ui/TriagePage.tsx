@@ -1,7 +1,16 @@
 import { Ban, CheckCircle2, Circle, Inbox, ListTodo, RotateCcw } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { Chat, Message, PersonAlias, ResolveAliasesResponse, TriageItem, TriageItemsResponse, UpsertAliasResponse } from "../api/types";
+import type {
+  Chat,
+  GchatSenderResponse,
+  Message,
+  PersonAlias,
+  ResolveAliasesResponse,
+  TriageItem,
+  TriageItemsResponse,
+  UpsertAliasResponse,
+} from "../api/types";
 import { MessageBubble } from "./MessageBubble";
 import { Markdown } from "./Markdown";
 
@@ -72,6 +81,8 @@ export function TriagePage({
   const [aliasName, setAliasName] = useState("");
   const [aliasUserId, setAliasUserId] = useState("");
   const [aliasSaving, setAliasSaving] = useState(false);
+  const [aliasLookupBusy, setAliasLookupBusy] = useState(false);
+  const [lastSenderLookup, setLastSenderLookup] = useState("");
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
@@ -285,6 +296,7 @@ export function TriagePage({
   }, []);
 
   const selectedSpace = selected?.source?.provider === "gchat" ? String(selected?.source?.space || "") : "";
+  const selectedMessage = selected?.source?.provider === "gchat" ? String(selected?.source?.message || "") : "";
   const selectedAlias = selectedSpace ? aliasMap[selectedSpace] : null;
 
   useEffect(() => {
@@ -296,6 +308,26 @@ export function TriagePage({
     setAliasName(selectedAlias?.displayName || "");
     setAliasUserId(selectedAlias?.providerUserId || "");
   }, [selectedSpace, selectedAlias?.displayName, selectedAlias?.providerUserId]);
+
+  useEffect(() => {
+    if (!selectedSpace || !selectedMessage) return;
+    if (aliasUserId || selectedAlias?.providerUserId || aliasLookupBusy) return;
+    if (lastSenderLookup === selectedMessage) return;
+    setAliasLookupBusy(true);
+    api<GchatSenderResponse>("/api/people/gchat/sender", {
+      method: "POST",
+      body: JSON.stringify({ message: selectedMessage, accountKey: "work" }),
+    })
+      .then((res) => {
+        const userId = res?.sender?.senderUserId || "";
+        if (userId) setAliasUserId(userId);
+      })
+      .catch(() => {})
+      .finally(() => {
+        setLastSenderLookup(selectedMessage);
+        setAliasLookupBusy(false);
+      });
+  }, [selectedSpace, selectedMessage, aliasUserId, selectedAlias?.providerUserId, aliasLookupBusy, lastSenderLookup]);
 
   async function saveAlias() {
     if (!selectedSpace) return;
@@ -571,15 +603,11 @@ export function TriagePage({
                   <div className="row wrap">
                     <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
                       <div className="muted">Contact name</div>
-                      <input className="input" value={aliasName} onChange={(e) => setAliasName(e.target.value)} placeholder="Oscar Frost" />
-                    </label>
-                    <label style={{ display: "grid", gap: 6, minWidth: 240 }}>
-                      <div className="muted">User id (optional)</div>
                       <input
                         className="input"
-                        value={aliasUserId}
-                        onChange={(e) => setAliasUserId(e.target.value)}
-                        placeholder="users/12345678901234567890"
+                        value={aliasName}
+                        onChange={(e) => setAliasName(e.target.value)}
+                        placeholder="Contact Name"
                       />
                     </label>
                     <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
