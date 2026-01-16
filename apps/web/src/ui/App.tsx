@@ -1,4 +1,4 @@
-import { LayoutList, ListTodo, Menu, MessageSquare, Plus, Settings2, X } from "lucide-react";
+import { LayoutList, ListTodo, Menu, MessageSquare, Plus, Settings2, Users, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type {
@@ -16,6 +16,7 @@ import { MessageBubble } from "./MessageBubble";
 import { SettingsPage } from "./SettingsPage";
 import { TriagePage } from "./TriagePage";
 import { PmWorkspace } from "./pm/PmWorkspace";
+import { ContactsPage } from "./ContactsPage";
 
 type ChatsListResponse = { ok: true; chats: ChatSummary[] };
 type ChatResponse = { ok: true; chat: Chat };
@@ -32,14 +33,13 @@ export function App() {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "triage" | "pm">("chat");
+  const [view, setView] = useState<"chat" | "triage" | "pm" | "contacts" | "settings">("chat");
 
   const [contextVisible, setContextVisible] = useState(false);
   const [context, setContext] = useState<ContextBundle | null>(null);
   const [contextMetrics, setContextMetrics] = useState<ContextMetrics | null>(null);
 
   const [composer, setComposer] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [accounts, setAccounts] = useState<CodexAccountsResponse | null>(null);
   const [runnerSettings, setRunnerSettings] = useState<RunnerSettingsResponse | null>(null);
@@ -84,7 +84,7 @@ export function App() {
     setActiveChat(null);
     setActiveChatId(null);
     setChats([]);
-    setSettingsOpen(false);
+    setViewAndRoute("chat");
   }
 
   async function refreshChats() {
@@ -97,7 +97,7 @@ export function App() {
   }
 
   async function loadChat(chatId: string) {
-    setView("chat");
+    setViewAndRoute("chat");
     setActiveChatId(chatId);
     try {
       const res = await api<ChatResponse>(`/api/chats/${chatId}`);
@@ -322,24 +322,44 @@ export function App() {
     })();
   }, []);
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const settings = url.searchParams.get("settings");
-    if (settings === "accounts" || settings === "settings") {
-      setSettingsOpen(true);
-      url.searchParams.delete("settings");
-      url.searchParams.delete("google");
-      url.searchParams.delete("key");
-      window.history.replaceState({}, "", url.toString());
+  function viewFromPath(path: string) {
+    if (path.startsWith("/triage")) return "triage";
+    if (path.startsWith("/pm")) return "pm";
+    if (path.startsWith("/contacts")) return "contacts";
+    if (path.startsWith("/settings")) return "settings";
+    return "chat";
+  }
+
+  function pathForView(nextView: typeof view) {
+    if (nextView === "triage") return "/triage";
+    if (nextView === "pm") return "/pm";
+    if (nextView === "contacts") return "/contacts";
+    if (nextView === "settings") return "/settings";
+    return "/chats";
+  }
+
+  function setViewAndRoute(nextView: typeof view) {
+    setView(nextView);
+    const path = pathForView(nextView);
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, "", path);
     }
+  }
+
+  useEffect(() => {
+    const sync = () => setView(viewFromPath(window.location.pathname || "/"));
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
   }, []);
 
   useEffect(() => {
+    if (view !== "chat") return;
     if (chats.length === 0) return;
     if (!activeChatId) {
       void loadChat(chats[0].id);
     }
-  }, [chats, activeChatId]);
+  }, [chats, activeChatId, view]);
 
   useEffect(() => {
     // Close any in-flight streams when switching chats.
@@ -428,8 +448,21 @@ export function App() {
     return parts.join(" · ");
   }, [lastUsage]);
 
+  const viewTitle =
+    view === "triage"
+      ? "Triage"
+      : view === "pm"
+        ? "PM"
+        : view === "contacts"
+          ? "Contacts"
+          : view === "settings"
+            ? "Settings"
+            : activeChat?.title || "Select a chat";
+
   return (
-    <div className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" || view === "pm" ? " triageMode" : ""}`}>
+    <div
+      className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" || view === "pm" || view === "contacts" || view === "settings" ? " triageMode" : ""}`}
+    >
       {authStatus && !authStatus.authenticated ? (
         <AuthOverlay
           status={authStatus}
@@ -479,7 +512,7 @@ export function App() {
                   {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
               ) : null}
-              <div className="chatTitle">{view === "triage" ? "Triage" : view === "pm" ? "PM" : activeChat?.title || "Select a chat"}</div>
+              <div className="chatTitle">{viewTitle}</div>
             </div>
             <div className="activeAccount">
               {activeAccountLabel}
@@ -494,34 +527,6 @@ export function App() {
             ) : null}
           </div>
           <div className="topbarRight">
-            {view === "triage" || view === "pm" ? (
-              <button className="btn secondary" onClick={() => setView("chat")} title="Chats">
-                <MessageSquare size={16} />
-                Chats
-              </button>
-            ) : null}
-            <button
-              className={`btn${view === "triage" ? " secondary" : ""}`}
-              onClick={() => {
-                setSidebarOpen(false);
-                setView("triage");
-              }}
-              title="Triage"
-            >
-              <LayoutList size={16} />
-              Triage
-            </button>
-            <button
-              className={`btn${view === "pm" ? " secondary" : ""}`}
-              onClick={() => {
-                setSidebarOpen(false);
-                setView("pm");
-              }}
-              title="PM"
-            >
-              <ListTodo size={16} />
-              PM
-            </button>
             {view === "chat" ? (
               <button
                 className="btn secondary"
@@ -534,8 +539,39 @@ export function App() {
                 Context
               </button>
             ) : null}
-            <button className="btn iconBtn" onClick={() => setSettingsOpen(true)} title="Settings">
-              <Settings2 size={18} />
+            <button className={`btn${view === "chat" ? " secondary" : ""}`} onClick={() => setViewAndRoute("chat")} title="Chats">
+              <MessageSquare size={16} />
+              Chats
+            </button>
+            <button
+              className={`btn${view === "triage" ? " secondary" : ""}`}
+              onClick={() => {
+                setSidebarOpen(false);
+                setViewAndRoute("triage");
+              }}
+              title="Triage"
+            >
+              <LayoutList size={16} />
+              Triage
+            </button>
+            <button
+              className={`btn${view === "pm" ? " secondary" : ""}`}
+              onClick={() => {
+                setSidebarOpen(false);
+                setViewAndRoute("pm");
+              }}
+              title="PM"
+            >
+              <ListTodo size={16} />
+              PM
+            </button>
+            <button className={`btn${view === "contacts" ? " secondary" : ""}`} onClick={() => setViewAndRoute("contacts")} title="Contacts">
+              <Users size={16} />
+              Contacts
+            </button>
+            <button className={`btn${view === "settings" ? " secondary" : ""}`} onClick={() => setViewAndRoute("settings")} title="Settings">
+              <Settings2 size={16} />
+              Settings
             </button>
           </div>
         </header>
@@ -577,25 +613,30 @@ export function App() {
           <section className="triageMain">
             <TriagePage onOpenChat={(chatId) => loadChat(chatId)} />
           </section>
-        ) : (
+        ) : view === "pm" ? (
           <section className="triageMain">
             <PmWorkspace />
           </section>
+        ) : view === "contacts" ? (
+          <section className="triageMain">
+            <ContactsPage />
+          </section>
+        ) : (
+          <section className="triageMain">
+            <SettingsPage
+              embedded
+              onClose={() => setViewAndRoute("chat")}
+              onLoggedOut={async () => {
+                await refreshAuthStatus();
+                handleUnauthorized();
+              }}
+              accounts={accounts}
+              refreshAccounts={refreshAccounts}
+              contextMetrics={contextMetrics}
+            />
+          </section>
         )}
       </main>
-
-      {settingsOpen ? (
-        <SettingsPage
-          onClose={() => setSettingsOpen(false)}
-          onLoggedOut={async () => {
-            await refreshAuthStatus();
-            handleUnauthorized();
-          }}
-          accounts={accounts}
-          refreshAccounts={refreshAccounts}
-          contextMetrics={contextMetrics}
-        />
-      ) : null}
     </div>
   );
 }

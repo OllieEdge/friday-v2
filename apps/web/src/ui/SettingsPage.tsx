@@ -14,12 +14,14 @@ export function SettingsPage({
   accounts,
   refreshAccounts,
   contextMetrics,
+  embedded = false,
 }: {
   onClose: () => void;
   onLoggedOut: () => Promise<void>;
   accounts: CodexAccountsResponse | null;
   refreshAccounts: () => Promise<void>;
   contextMetrics: ContextMetrics | null;
+  embedded?: boolean;
 }) {
   const [section, setSection] = useState<Section>("accounts");
 
@@ -31,62 +33,71 @@ export function SettingsPage({
     return "Settings";
   }, [section]);
 
-  return (
-    <div className="settingsOverlay" role="dialog" aria-modal="true">
-      <div className="settingsShell">
-        <div className="settingsHeader">
-          <div className="settingsHeaderLeft">
+  const body = (
+    <div className={`settingsShell${embedded ? " embedded" : ""}`}>
+      <div className="settingsHeader">
+        <div className="settingsHeaderLeft">
+          {!embedded ? (
             <button className="btn iconBtn mobileOnly" onClick={onClose} title="Back">
               <ChevronLeft size={18} />
             </button>
-            <div className="settingsTitle">Settings · {title}</div>
-          </div>
+          ) : null}
+          <div className="settingsTitle">Settings · {title}</div>
+        </div>
+        {!embedded ? (
           <button className="btn iconBtn" onClick={onClose} title="Close">
             <X size={18} />
           </button>
-        </div>
+        ) : null}
+      </div>
 
-        <div className="settingsBody">
-          <nav className="settingsNav" aria-label="Settings navigation">
-            <button
-              className={`settingsNavItem${section === "accounts" ? " active" : ""}`}
-              onClick={() => setSection("accounts")}
-            >
-              Accounts
-            </button>
-            <button
-              className={`settingsNavItem${section === "scheduled" ? " active" : ""}`}
-              onClick={() => setSection("scheduled")}
-            >
-              Scheduled
-            </button>
-            <button
-              className={`settingsNavItem${section === "pm" ? " active" : ""}`}
-              onClick={() => setSection("pm")}
-            >
-              PM
-            </button>
-            <button
-              className={`settingsNavItem${section === "security" ? " active" : ""}`}
-              onClick={() => setSection("security")}
-            >
-              Security
-            </button>
-          </nav>
+      <div className="settingsBody">
+        <nav className="settingsNav" aria-label="Settings navigation">
+          <button
+            className={`settingsNavItem${section === "accounts" ? " active" : ""}`}
+            onClick={() => setSection("accounts")}
+          >
+            Accounts
+          </button>
+          <button
+            className={`settingsNavItem${section === "scheduled" ? " active" : ""}`}
+            onClick={() => setSection("scheduled")}
+          >
+            Scheduled
+          </button>
+          <button
+            className={`settingsNavItem${section === "pm" ? " active" : ""}`}
+            onClick={() => setSection("pm")}
+          >
+            PM
+          </button>
+          <button
+            className={`settingsNavItem${section === "security" ? " active" : ""}`}
+            onClick={() => setSection("security")}
+          >
+            Security
+          </button>
+        </nav>
 
-          <div className="settingsContent">
-            {section === "accounts" ? (
-              <AccountsPanel accounts={accounts} refreshAccounts={refreshAccounts} contextMetrics={contextMetrics} />
-            ) : section === "scheduled" ? (
-              <ScheduledPanel />
-            ) : section === "pm" ? (
-              <PmPanel />
-            ) : section === "security" ? (
-              <SecurityPanel onLoggedOut={onLoggedOut} />
-            ) : null}
-          </div>
+        <div className="settingsContent">
+          {section === "accounts" ? (
+            <AccountsPanel accounts={accounts} refreshAccounts={refreshAccounts} contextMetrics={contextMetrics} />
+          ) : section === "scheduled" ? (
+            <ScheduledPanel />
+          ) : section === "pm" ? (
+            <PmPanel />
+          ) : section === "security" ? (
+            <SecurityPanel onLoggedOut={onLoggedOut} />
+          ) : null}
         </div>
       </div>
+    </div>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="settingsOverlay" role="dialog" aria-modal="true">
+      {body}
     </div>
   );
 }

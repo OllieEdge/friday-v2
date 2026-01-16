@@ -103,6 +103,26 @@ async function fetchChatThread({ spaceId, googleAccounts, accountKey = "work", m
 }
 
 function registerPeople(router, { people, googleAccounts }) {
+  router.add("GET", "/api/people", async (_req, res) => {
+    const list = people.listPeople();
+    return sendJson(res, 200, { ok: true, people: list });
+  });
+
+  router.add("POST", "/api/people/identify", async (req, res) => {
+    const body = (await readJson(req)) || {};
+    const personId = body?.personId == null ? null : String(body.personId).trim();
+    const displayName = String(body?.displayName || "").trim();
+    const provider = String(body?.provider || "").trim();
+    const providerUserId = String(body?.providerUserId || "").trim();
+    const label = body?.label == null ? null : String(body.label).trim();
+    if (!displayName || !provider || !providerUserId) {
+      return sendJson(res, 400, { ok: false, error: "missing_fields" });
+    }
+    const person = people.upsertIdentity({ personId, displayName, provider, providerUserId, label });
+    if (!person) return sendJson(res, 400, { ok: false, error: "invalid_identity" });
+    return sendJson(res, 200, { ok: true, person });
+  });
+
   router.add("POST", "/api/people/aliases/resolve", async (req, res) => {
     const body = (await readJson(req)) || {};
     const provider = String(body?.provider || "").trim();

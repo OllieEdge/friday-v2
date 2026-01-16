@@ -6,8 +6,11 @@ import type {
   GchatSenderResponse,
   GchatThreadMessage,
   GchatThreadResponse,
+  IdentifyPersonResponse,
   Message,
+  PeopleResponse,
   PersonAlias,
+  PersonRecord,
   ResolveAliasesResponse,
   TriageItem,
   TriageItemsResponse,
@@ -88,6 +91,12 @@ export function TriagePage({
   const [threadMessages, setThreadMessages] = useState<GchatThreadMessage[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState("");
+  const [people, setPeople] = useState<PersonRecord[]>([]);
+  const [peopleMap, setPeopleMap] = useState<Record<string, string>>({});
+  const [autoAliasedSpaces, setAutoAliasedSpaces] = useState<Record<string, boolean>>({});
+  const [contactDraft, setContactDraft] = useState<{ displayName: string; providerUserId: string; personId: string } | null>(null);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactError, setContactError] = useState("");
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
@@ -173,6 +182,25 @@ export function TriagePage({
       next[alias.spaceId] = alias;
     }
     setAliasMap(next);
+  }
+
+  async function refreshPeople() {
+    try {
+      const res = await api<PeopleResponse>("/api/people");
+      const list = res.people || [];
+      setPeople(list);
+      const map: Record<string, string> = {};
+      for (const person of list) {
+        for (const ident of person.identities || []) {
+          const key = `${ident.provider}:${ident.providerUserId}`;
+          map[key] = person.displayName;
+        }
+      }
+      setPeopleMap(map);
+    } catch {
+      setPeople([]);
+      setPeopleMap({});
+    }
   }
 
   async function setItemStatus(item: TriageItem, status: "open" | "completed" | "dismissed") {
@@ -296,6 +324,7 @@ export function TriagePage({
 
   useEffect(() => {
     void refreshLists();
+    void refreshPeople();
     const t = setInterval(() => refreshLists().catch(() => {}), 15000);
     return () => clearInterval(t);
   }, []);
@@ -313,6 +342,33 @@ export function TriagePage({
     setAliasName(selectedAlias?.displayName || "");
     setAliasUserId(selectedAlias?.providerUserId || "");
   }, [selectedSpace, selectedAlias?.displayName, selectedAlias?.providerUserId]);
+
+  useEffect(() => {
+    if (!selectedMessage || aliasName.trim()) return;
+    if (!aliasUserId) return;
+    const known = peopleMap[`gchat:${aliasUserId}`];
+    if (known) setAliasName(known);
+  }, [selectedMessage, aliasUserId, aliasName, peopleMap]);
+
+  useEffect(() => {
+    if (!selectedSpace || !aliasUserId) return;
+    if (selectedAlias?.displayName) return;
+    if (autoAliasedSpaces[selectedSpace]) return;
+    const known = peopleMap[`gchat:${aliasUserId}`];
+    if (!known) return;
+    setAutoAliasedSpaces((prev) => ({ ...prev, [selectedSpace]: true }));
+    api<UpsertAliasResponse>("/api/people/aliases", {
+      method: "POST",
+      body: JSON.stringify({
+        provider: "gchat",
+        spaceId: selectedSpace,
+        displayName: known,
+        providerUserId: aliasUserId.trim() || null,
+      }),
+    })
+      .then((res) => setAliasMap((prev) => ({ ...prev, [selectedSpace]: res.alias })))
+      .catch(() => {});
+  }, [selectedSpace, aliasUserId, selectedAlias?.displayName, autoAliasedSpaces, peopleMap]);
 
   useEffect(() => {
     if (!selectedSpace || !selectedMessage) return;
@@ -367,8 +423,36 @@ export function TriagePage({
         }),
       });
       setAliasMap((prev) => ({ ...prev, [selectedSpace]: res.alias }));
+      await refreshPeople();
     } finally {
       setAliasSaving(false);
+    }
+  }
+
+  async function saveContact() {
+    if (!contactDraft) return;
+    const name = contactDraft.displayName.trim();
+    const id = contactDraft.providerUserId.trim();
+    if (!name || !id) return;
+    setContactSaving(true);
+    setContactError("");
+    try {
+      await api<IdentifyPersonResponse>("/api/people/identify", {
+        method: "POST",
+        body: JSON.stringify({
+          displayName: name,
+          provider: "gchat",
+          providerUserId: id,
+          personId: contactDraft.personId.trim() || null,
+          label: null,
+        }),
+      });
+      setContactDraft(null);
+      await refreshPeople();
+    } catch (e: any) {
+      setContactError(String(e?.message || e));
+    } finally {
+      setContactSaving(false);
     }
   }
 
@@ -379,6 +463,16 @@ export function TriagePage({
       if (alias?.displayName) return `Chat: ${alias.displayName}`;
     }
     return item.title;
+  }
+
+  function senderLabel(msg: GchatThreadMessage) {
+    const userId = msg.sender?.name || "";
+    if (msg.sender?.displayName) return msg.sender.displayName;
+    if (userId) {
+      const known = peopleMap[`gchat:${userId}`];
+      if (known) return known;
+    }
+    return userId ? `Unknown (${userId})` : "Unknown";
   }
 
   const selectedHeader = useMemo(() => {
@@ -655,20 +749,66 @@ export function TriagePage({
                   ) : threadError ? (
                     <div className="muted">Thread error: {threadError}</div>
                   ) : threadMessages.length ? (
-                    <div className="triageChat">
+                    <div className="triageChat short">
                       {threadMessages.map((m) => (
-                        <div key={m.name || `${m.createTime}-${m.text.slice(0, 12)}`} className="messageBubble">
+                        <div key={m.name || `${m.createTime}-${m.text.slice(0, 12)}`} className="msg">
                           <div className="messageMeta">
-                            {m.sender?.displayName || m.sender?.name || "Unknown"} ·{" "}
+                            {senderLabel(m)} ·{" "}
                             {m.createTime ? new Date(m.createTime).toLocaleString() : "unknown time"}
                           </div>
                           <div className="messageText">{m.text || "(no text)"}</div>
+                          {!m.sender?.displayName && m.sender?.name && !peopleMap[`gchat:${m.sender.name}`] ? (
+                            <button
+                              className="btn secondary tiny"
+                              onClick={() => setContactDraft({ displayName: "", providerUserId: m.sender?.name || "", personId: "" })}
+                            >
+                              Add contact
+                            </button>
+                          ) : null}
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="muted">No recent messages in the last 3 months.</div>
                   )}
+                  {contactDraft ? (
+                    <div className="row wrap" style={{ marginTop: 10 }}>
+                      <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
+                        <div className="muted">Contact name</div>
+                        <input
+                          className="input"
+                          value={contactDraft.displayName}
+                          onChange={(e) => setContactDraft({ ...contactDraft, displayName: e.target.value })}
+                          placeholder="Contact Name"
+                        />
+                      </label>
+                      <label style={{ display: "grid", gap: 6, minWidth: 200 }}>
+                        <div className="muted">Attach to existing</div>
+                        <select
+                          className="input"
+                          value={contactDraft.personId}
+                          onChange={(e) => setContactDraft({ ...contactDraft, personId: e.target.value })}
+                        >
+                          <option value="">New contact</option>
+                          {people.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label style={{ display: "grid", gap: 6, minWidth: 260 }}>
+                        <div className="muted">User id</div>
+                        <input className="input" value={contactDraft.providerUserId} readOnly />
+                      </label>
+                      <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
+                        <button className="btn secondary" onClick={() => void saveContact()} disabled={contactSaving || !contactDraft.displayName.trim()}>
+                          {contactSaving ? "Saving..." : "Save contact"}
+                        </button>
+                      </div>
+                      {contactError ? <div className="muted">Error: {contactError}</div> : null}
+                    </div>
+                  ) : null}
                   <div className="settingsDivider" />
                 </>
               ) : null}

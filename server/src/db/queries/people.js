@@ -2,6 +2,75 @@ const { newId } = require("../../utils/id");
 const { nowIso } = require("../../utils/time");
 
 function createPeopleQueries(db) {
+  function listPeople() {
+    const people = db
+      .prepare("SELECT id, display_name AS displayName, notes, created_at AS createdAt, updated_at AS updatedAt FROM people ORDER BY updated_at DESC;")
+      .all();
+    const identities = db
+      .prepare(
+        "SELECT id, person_id AS personId, provider, provider_user_id AS providerUserId, label, created_at AS createdAt, updated_at AS updatedAt FROM person_identities ORDER BY updated_at DESC;",
+      )
+      .all();
+    const byPerson = new Map();
+    for (const ident of identities) {
+      if (!byPerson.has(ident.personId)) byPerson.set(ident.personId, []);
+      byPerson.get(ident.personId).push(ident);
+    }
+    return people.map((person) => ({ ...person, identities: byPerson.get(person.id) || [] }));
+  }
+
+  function upsertIdentity({ personId, displayName, provider, providerUserId, label = null }) {
+    const now = nowIso();
+    const prov = String(provider || "").trim();
+    const userId = String(providerUserId || "").trim();
+    const name = String(displayName || "").trim();
+    if (!prov || !userId) return null;
+
+    let pid = personId ? String(personId).trim() : "";
+    if (pid) {
+      const existing = db.prepare("SELECT id FROM people WHERE id = ?;").get(pid);
+      if (!existing) pid = "";
+    }
+
+    if (!pid) {
+      pid = newId();
+      db.prepare("INSERT INTO people (id, display_name, notes, created_at, updated_at) VALUES (?, ?, NULL, ?, ?);").run(
+        pid,
+        name || "Unknown",
+        now,
+        now,
+      );
+    } else if (name) {
+      db.prepare("UPDATE people SET display_name = ?, updated_at = ? WHERE id = ?;").run(name, now, pid);
+    }
+
+    const identityLabel = label == null ? null : String(label || "").trim() || null;
+    const existingIdent = db
+      .prepare("SELECT id FROM person_identities WHERE provider = ? AND provider_user_id = ?;")
+      .get(prov, userId);
+    if (existingIdent?.id) {
+      db.prepare("UPDATE person_identities SET person_id = ?, label = ?, updated_at = ? WHERE id = ?;").run(
+        pid,
+        identityLabel,
+        now,
+        existingIdent.id,
+      );
+    } else {
+      db.prepare(
+        "INSERT INTO person_identities (id, person_id, provider, provider_user_id, label, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?);",
+      ).run(newId(), pid, prov, userId, identityLabel, now, now);
+    }
+
+    const person = db
+      .prepare("SELECT id, display_name AS displayName, notes, created_at AS createdAt, updated_at AS updatedAt FROM people WHERE id = ?;")
+      .get(pid);
+    const identities = db
+      .prepare(
+        "SELECT id, person_id AS personId, provider, provider_user_id AS providerUserId, label, created_at AS createdAt, updated_at AS updatedAt FROM person_identities WHERE person_id = ? ORDER BY updated_at DESC;",
+      )
+      .all(pid);
+    return person ? { ...person, identities } : null;
+  }
   function listSpaceAliases({ provider, spaceIds }) {
     const prov = String(provider || "").trim();
     const ids = Array.isArray(spaceIds) ? spaceIds.map((s) => String(s || "").trim()).filter(Boolean) : [];
@@ -123,7 +192,7 @@ function createPeopleQueries(db) {
     };
   }
 
-  return { listSpaceAliases, upsertSpaceAlias };
+  return { listPeople, upsertIdentity, listSpaceAliases, upsertSpaceAlias };
 }
 
 module.exports = { createPeopleQueries };

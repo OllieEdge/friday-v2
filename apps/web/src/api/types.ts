@@ -253,6 +253,35 @@ export type GchatThreadResponse = {
   messages: GchatThreadMessage[];
 };
 
+export type PersonIdentity = {
+  id: string;
+  personId: string;
+  provider: string;
+  providerUserId: string;
+  label: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PersonRecord = {
+  id: string;
+  displayName: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  identities: PersonIdentity[];
+};
+
+export type PeopleResponse = {
+  ok: true;
+  people: PersonRecord[];
+};
+
+export type IdentifyPersonResponse = {
+  ok: true;
+  person: PersonRecord;
+};
+
 export type RunbookSummary = {
   id: string;
   title: string;
