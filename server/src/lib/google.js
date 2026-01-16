@@ -36,9 +36,28 @@ function resolveGoogleScopesForPurpose({ baseScopes, purpose }) {
   return String(baseScopes || "").trim();
 }
 
-function requireGoogleConfig() {
-  const clientId = envString("GOOGLE_CLIENT_ID", "");
-  const clientSecret = envString("GOOGLE_CLIENT_SECRET", "");
+function resolveClientConfig(accountKey) {
+  const key = String(accountKey || "").trim().toLowerCase();
+  if (key === "work") {
+    return {
+      clientId: envString("GOOGLE_CLIENT_ID_WORK", "") || envString("GOOGLE_CLIENT_ID", ""),
+      clientSecret: envString("GOOGLE_CLIENT_SECRET_WORK", "") || envString("GOOGLE_CLIENT_SECRET", ""),
+    };
+  }
+  if (key === "personal") {
+    return {
+      clientId: envString("GOOGLE_CLIENT_ID_PERSONAL", "") || envString("GOOGLE_CLIENT_ID", ""),
+      clientSecret: envString("GOOGLE_CLIENT_SECRET_PERSONAL", "") || envString("GOOGLE_CLIENT_SECRET", ""),
+    };
+  }
+  return {
+    clientId: envString("GOOGLE_CLIENT_ID", ""),
+    clientSecret: envString("GOOGLE_CLIENT_SECRET", ""),
+  };
+}
+
+function requireGoogleConfig({ accountKey } = {}) {
+  const { clientId, clientSecret } = resolveClientConfig(accountKey);
   const scopes = envString(
     "GOOGLE_SCOPES",
     "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/chat.messages",
@@ -165,6 +184,7 @@ async function fetchUserInfo(accessToken) {
 module.exports = {
   normalizeAccountKey,
   requireGoogleConfig,
+  resolveClientConfig,
   resolveGoogleScopesForPurpose,
   buildRedirectUri,
   buildAuthUrl,

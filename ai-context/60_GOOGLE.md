@@ -23,6 +23,9 @@ Set these in `friday-v2/.env` on the host:
 - `FRIDAY_BASE_URL=https://friday2.edgflix.com`
 - `GOOGLE_CLIENT_ID=...`
 - `GOOGLE_CLIENT_SECRET=...`
+- Optional per-account OAuth clients:
+  - `GOOGLE_CLIENT_ID_WORK` / `GOOGLE_CLIENT_SECRET_WORK`
+  - `GOOGLE_CLIENT_ID_PERSONAL` / `GOOGLE_CLIENT_SECRET_PERSONAL`
 - `GOOGLE_SCOPES="openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/chat.messages"`
 
 If scopes change, re-connect accounts.

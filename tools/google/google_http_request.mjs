@@ -11,7 +11,7 @@ function usage(code = 0) {
 
 Notes:
   - Reads refresh token from Friday v2 SQLite (data/friday.sqlite)
-  - Uses GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET from .env or environment
+  - Uses GOOGLE_CLIENT_ID/SECRET or GOOGLE_CLIENT_ID_WORK/SECRET_WORK, GOOGLE_CLIENT_ID_PERSONAL/SECRET_PERSONAL
   - Prints response body to stdout; non-2xx exits non-zero
 `);
   process.exit(code);
@@ -73,11 +73,30 @@ const headerArgs = argValues(args, "--header");
 
 if (!accountKey || !url) usage(2);
 
-const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
-const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || "").trim();
+function resolveClient(accountKey) {
+  const key = String(accountKey || "").trim().toLowerCase();
+  if (key === "work") {
+    return {
+      clientId: String(process.env.GOOGLE_CLIENT_ID_WORK || process.env.GOOGLE_CLIENT_ID || "").trim(),
+      clientSecret: String(process.env.GOOGLE_CLIENT_SECRET_WORK || process.env.GOOGLE_CLIENT_SECRET || "").trim(),
+    };
+  }
+  if (key === "personal") {
+    return {
+      clientId: String(process.env.GOOGLE_CLIENT_ID_PERSONAL || process.env.GOOGLE_CLIENT_ID || "").trim(),
+      clientSecret: String(process.env.GOOGLE_CLIENT_SECRET_PERSONAL || process.env.GOOGLE_CLIENT_SECRET || "").trim(),
+    };
+  }
+  return {
+    clientId: String(process.env.GOOGLE_CLIENT_ID || "").trim(),
+    clientSecret: String(process.env.GOOGLE_CLIENT_SECRET || "").trim(),
+  };
+}
+
+const { clientId, clientSecret } = resolveClient(accountKey);
 if (!clientId || !clientSecret) {
   // eslint-disable-next-line no-console
-  console.error("Missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (set them in friday-v2/.env).");
+  console.error("Missing Google OAuth client (set GOOGLE_CLIENT_ID/SECRET or per-account variants in friday-v2/.env).");
   process.exit(2);
 }
 
@@ -156,4 +175,3 @@ if (!resp.ok) {
   process.exit(1);
 }
 process.stdout.write(out);
-

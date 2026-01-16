@@ -146,7 +146,7 @@ async function getVertexAccessToken({ authMode, googleAccounts, googleAccountKey
       throw new Error(`Google account '${key}' not connected (connect in Settings → Accounts → Google)`);
     }
 
-    const cfg = requireGoogleConfig();
+    const cfg = requireGoogleConfig({ accountKey: key });
     const tokens = await exchangeRefreshTokenForAccessToken({
       refreshToken,
       clientId: cfg.clientId,

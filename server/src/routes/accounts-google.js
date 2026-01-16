@@ -44,7 +44,7 @@ function registerGoogleAccounts(router, { googleAccounts }) {
 
   router.add("POST", "/api/accounts/google/:accountKey/connect/start", async (req, res, _url, params) => {
     const accountKey = keyOrThrow(params.accountKey);
-    const cfg = requireGoogleConfig();
+    const cfg = requireGoogleConfig({ accountKey });
     const body = await readJson(req);
     const returnTo = safeReturnTo(body?.returnTo);
     const purpose = safePurpose(body?.purpose);
@@ -85,7 +85,7 @@ function registerGoogleAccounts(router, { googleAccounts }) {
     if (!stateRow) return sendJson(res, 400, { ok: false, error: "invalid_state" });
     if (stateRow.accountKey !== accountKey) return sendJson(res, 400, { ok: false, error: "invalid_state" });
 
-    const cfg = requireGoogleConfig();
+    const cfg = requireGoogleConfig({ accountKey });
     const tokens = await exchangeCodeForTokens({
       code,
       clientId: cfg.clientId,
