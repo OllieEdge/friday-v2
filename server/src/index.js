@@ -34,6 +34,7 @@ const { registerRunnerSettings } = require("./routes/runner-settings");
 const { registerModels } = require("./routes/models");
 const { registerTools } = require("./routes/tools");
 const { registerTriage } = require("./routes/triage");
+const { registerSlack } = require("./routes/slack");
 const { registerRunbooks } = require("./routes/runbooks");
 const { registerPeople } = require("./routes/people");
 const { registerAuth, requireUser } = require("./routes/auth");
@@ -115,6 +116,7 @@ registerModels(router, { settings, googleAccounts });
 registerTools(router);
 registerPeople(router, { people, googleAccounts });
 registerTriage(router, { triage });
+registerSlack(router, { chats, triage, tasks });
 registerRunbooks(router, {
   runbooksDir: RUNBOOKS_DIR,
   runbooksDb,
@@ -139,6 +141,7 @@ const server = http.createServer(async (req, res) => {
       const isPublic =
         url.pathname === "/api/health" ||
         url.pathname === "/api/tools/exec" ||
+        url.pathname === "/api/slack/events" ||
         url.pathname.startsWith("/api/auth/") ||
         // allow OAuth callbacks to read the session cookie if present; otherwise they'll be rejected by handler.
         url.pathname.startsWith("/oauth/");

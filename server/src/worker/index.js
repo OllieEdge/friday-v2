@@ -13,6 +13,7 @@ const { createPmProjectsQueries } = require("../db/queries/pm-projects");
 const { loadContextBundle } = require("../lib/context");
 const { runAssistant } = require("../lib/runner");
 const { estimateCostUsd } = require("../lib/cost");
+const { getSlackConfig, postSlackMessage } = require("../lib/slack");
 const { createTrelloCard, commentOnCard, ensureChecklist, ensureChecklistItem, setChecklistItemState, getCard, updateCardDesc } = require("../lib/trello");
 const { summarizeText } = require("../lib/summarizer");
 const { mergeRelatedCards } = require("../lib/pm-utils");
@@ -35,6 +36,17 @@ function recordProfileUsage({ codexProfiles, profileId, usage, costUsd }) {
 
 function normalizeText(value) {
   return String(value ?? "").trim();
+}
+
+function extractSlackReply(text) {
+  const raw = String(text || "");
+  const match = raw.match(/```slack_reply\s*([\s\S]*?)```/i);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
 }
 
 function extractPmActions(text) {
@@ -305,6 +317,88 @@ async function runChatTask({ task }) {
   }
 }
 
+async function runSlackAutoReplyTask({ task }) {
+  const input = task?.input || {};
+  const channel = normalizeText(input.channel);
+  const text = normalizeText(input.text);
+  if (!channel || !text) {
+    tasks.appendEvent({ taskId: task.id, event: { type: "error", message: "Invalid Slack task input." } });
+    tasks.setStatus({ taskId: task.id, status: "error", completedAt: new Date().toISOString() });
+    return;
+  }
+
+  const cfg = getSlackConfig();
+  if (!cfg.botToken) {
+    tasks.appendEvent({ taskId: task.id, event: { type: "error", message: "Missing SLACK_BOT_TOKEN." } });
+    tasks.setStatus({ taskId: task.id, status: "error", completedAt: new Date().toISOString() });
+    return;
+  }
+
+  const startedAt = new Date().toISOString();
+  tasks.appendEvent({ taskId: task.id, event: { type: "status", stage: "loading_context" } });
+  const context = loadContext();
+  tasks.appendEvent({ taskId: task.id, event: { type: "status", stage: "running" } });
+
+  const prompt = [
+    "You are Friday, replying on Oliver's behalf.",
+    "Draft a short, helpful response to the Slack message below.",
+    "Return ONLY a ```slack_reply``` JSON block with:",
+    "- replyText: string",
+    "- confidencePct: number 0-100",
+    "- shouldReply: boolean",
+    "- reason: short string",
+    "",
+    `Message: ${text}`,
+  ].join("\n");
+
+  try {
+    const chat = { messages: [{ role: "user", content: prompt }] };
+    const result = await runAssistant({
+      context,
+      chat,
+      googleAccounts,
+      onEvent: (ev) => tasks.appendEvent({ taskId: task.id, event: ev }),
+      getActiveCodexProfile,
+      getCodexRunnerPrefs,
+      getAssistantRunnerPrefs,
+    });
+
+    const output = String(result?.content || "");
+    const parsed = extractSlackReply(output) || {};
+    const replyText = normalizeText(parsed.replyText);
+    const confidencePct = Number(parsed.confidencePct || 0);
+    const shouldReply = Boolean(parsed.shouldReply) && replyText.length > 0;
+
+    tasks.appendEvent({
+      taskId: task.id,
+      event: { type: "slack_reply", replyText, confidencePct, shouldReply, reason: normalizeText(parsed.reason) },
+    });
+
+    if (shouldReply && confidencePct >= cfg.autoReplyConfidence) {
+      const res = await postSlackMessage({ token: cfg.botToken, channel, text: replyText, threadTs: input.threadTs || null });
+      if (!res.ok) {
+        tasks.appendEvent({ taskId: task.id, event: { type: "error", message: `slack_send_failed:${res.error}` } });
+        tasks.setStatus({ taskId: task.id, status: "error", completedAt: new Date().toISOString() });
+        return;
+      }
+    }
+
+    const costUsd = result?.usage ? estimateCostUsd(result.usage) : null;
+    recordProfileUsage({ codexProfiles, profileId: result?.profileId, usage: result?.usage, costUsd });
+    if (result?.usage) {
+      tasks.appendEvent({ taskId: task.id, event: { type: "usage", usage: result.usage, costUsd } });
+    }
+
+    tasks.appendEvent({ taskId: task.id, event: { type: "done", ok: true, exitCode: 0 } });
+    tasks.setStatus({ taskId: task.id, status: "ok", completedAt: new Date().toISOString() });
+  } catch (e) {
+    const message = String(e?.message || e);
+    tasks.appendEvent({ taskId: task.id, event: { type: "error", message } });
+    tasks.appendEvent({ taskId: task.id, event: { type: "done", ok: false, exitCode: null } });
+    tasks.setStatus({ taskId: task.id, status: "error", completedAt: new Date().toISOString() });
+  }
+}
+
 async function runPmChatTask({ task }) {
   const chatId = task?.input?.chatId;
   const assistantMessageId = task?.input?.assistantMessageId;
@@ -502,6 +596,7 @@ async function tick() {
   let task = null;
   try {
     task =
+      tasks.claimNextQueued({ kind: "slack_auto_reply" }) ||
       tasks.claimNextQueued({ kind: "pm_chat_run" }) ||
       tasks.claimNextQueued({ kind: "pm_command" }) ||
       tasks.claimNextQueued({ kind: "pm_request" }) ||
@@ -515,6 +610,7 @@ async function tick() {
   if (task.kind === "pm_command") await runPmCommandTask({ task });
   if (task.kind === "pm_request") await runPmTask({ task });
   if (task.kind === "chat_run") await runChatTask({ task });
+  if (task.kind === "slack_auto_reply") await runSlackAutoReplyTask({ task });
   return true;
 }
 
