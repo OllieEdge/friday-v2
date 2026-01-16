@@ -46,6 +46,32 @@ Creating a runbook via chat
   - `priority` (0=low, 1=normal, 2=high, 3=urgent)
   - `confidence_pct` (0–100): how sure the assistant is this matches what Oliver would do
 
+### Actioning patterns (Oliver)
+
+- Dismiss items that are clearly outside Oliver’s remit.
+- For in‑progress work that is top priority, keep the item open and bump priority to urgent.
+- For email threads: reply only to the necessary recipients (not always reply‑all).
+- If Oliver plans to handle something manually, mark the item completed after confirming intent.
+
+### Topic relevance (triage heuristics)
+
+Keep topics short (1–2 words). Categorize by likelihood Oliver should be involved.
+
+PROBABLE:
+- YouTube
+- Particles
+- Regwall
+- Paywall
+- WAF
+- XSS
+
+UNKNOWN:
+- Live blog
+- Newsletter
+
+IMPROBABLE:
+- LinkedIn
+
 Updating triage status
 - Users can change status in the UI.
 - The assistant can also update status by running:
