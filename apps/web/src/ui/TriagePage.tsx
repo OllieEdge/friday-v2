@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type {
   Chat,
   GchatSenderResponse,
+  GchatSpacesResponse,
   GchatThreadMessage,
   GchatThreadResponse,
   IdentifyPersonResponse,
@@ -18,6 +19,7 @@ import type {
 } from "../api/types";
 import { MessageBubble } from "./MessageBubble";
 import { Markdown } from "./Markdown";
+import { ContactPopover } from "./contacts/ContactPopover";
 
 type ChatResponse = { ok: true; chat: Chat };
 type UpdatePriorityResponse = { ok: true; item: TriageItem };
@@ -83,9 +85,7 @@ export function TriagePage({
   const [selected, setSelected] = useState<TriageItem | null>(null);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [aliasMap, setAliasMap] = useState<Record<string, PersonAlias>>({});
-  const [aliasName, setAliasName] = useState("");
   const [aliasUserId, setAliasUserId] = useState("");
-  const [aliasSaving, setAliasSaving] = useState(false);
   const [aliasLookupBusy, setAliasLookupBusy] = useState(false);
   const [lastSenderLookup, setLastSenderLookup] = useState("");
   const [threadMessages, setThreadMessages] = useState<GchatThreadMessage[]>([]);
@@ -94,9 +94,10 @@ export function TriagePage({
   const [people, setPeople] = useState<PersonRecord[]>([]);
   const [peopleMap, setPeopleMap] = useState<Record<string, string>>({});
   const [autoAliasedSpaces, setAutoAliasedSpaces] = useState<Record<string, boolean>>({});
-  const [contactDraft, setContactDraft] = useState<{ displayName: string; providerUserId: string; personId: string } | null>(null);
-  const [contactSaving, setContactSaving] = useState(false);
+  const [contactPopoverOpen, setContactPopoverOpen] = useState(false);
+  const [contactPreset, setContactPreset] = useState<{ displayName: string; providerUserId: string } | null>(null);
   const [contactError, setContactError] = useState("");
+  const [spaceMap, setSpaceMap] = useState<Record<string, { displayName: string; spaceType: string }>>({});
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
@@ -124,6 +125,7 @@ export function TriagePage({
     setRawNextActions(na.items);
     setRawCompleted(done.items);
     void refreshAliases([...qr.items, ...na.items, ...done.items]);
+    void refreshSpaces([...qr.items, ...na.items, ...done.items]);
   }
 
   const quickReads = useMemo(
@@ -200,6 +202,34 @@ export function TriagePage({
     } catch {
       setPeople([]);
       setPeopleMap({});
+    }
+  }
+
+  async function refreshSpaces(items: TriageItem[]) {
+    const spaceIds = Array.from(
+      new Set(
+        items
+          .map((it) => it.source)
+          .filter((src) => src && src.provider === "gchat" && src.space)
+          .map((src) => String(src.space)),
+      ),
+    );
+    if (spaceIds.length === 0) {
+      setSpaceMap({});
+      return;
+    }
+    try {
+      const res = await api<GchatSpacesResponse>("/api/people/gchat/spaces", {
+        method: "POST",
+        body: JSON.stringify({ spaceIds, accountKey: "work" }),
+      });
+      const next: Record<string, { displayName: string; spaceType: string }> = {};
+      for (const space of res.spaces || []) {
+        if (space?.spaceId) next[space.spaceId] = { displayName: space.displayName || "", spaceType: space.spaceType || "" };
+      }
+      setSpaceMap(next);
+    } catch {
+      setSpaceMap({});
     }
   }
 
@@ -335,20 +365,11 @@ export function TriagePage({
 
   useEffect(() => {
     if (!selectedSpace) {
-      setAliasName("");
       setAliasUserId("");
       return;
     }
-    setAliasName(selectedAlias?.displayName || "");
     setAliasUserId(selectedAlias?.providerUserId || "");
   }, [selectedSpace, selectedAlias?.displayName, selectedAlias?.providerUserId]);
-
-  useEffect(() => {
-    if (!selectedMessage || aliasName.trim()) return;
-    if (!aliasUserId) return;
-    const known = peopleMap[`gchat:${aliasUserId}`];
-    if (known) setAliasName(known);
-  }, [selectedMessage, aliasUserId, aliasName, peopleMap]);
 
   useEffect(() => {
     if (!selectedSpace || !aliasUserId) return;
@@ -407,52 +428,18 @@ export function TriagePage({
       .finally(() => setThreadLoading(false));
   }, [selectedSpace]);
 
-  async function saveAlias() {
-    if (!selectedSpace) return;
-    const name = aliasName.trim();
-    if (!name) return;
-    setAliasSaving(true);
-    try {
-      const res = await api<UpsertAliasResponse>("/api/people/aliases", {
-        method: "POST",
-        body: JSON.stringify({
-          provider: "gchat",
-          spaceId: selectedSpace,
-          displayName: name,
-          providerUserId: aliasUserId.trim() || null,
-        }),
-      });
-      setAliasMap((prev) => ({ ...prev, [selectedSpace]: res.alias }));
-      await refreshPeople();
-    } finally {
-      setAliasSaving(false);
-    }
-  }
-
-  async function saveContact() {
-    if (!contactDraft) return;
-    const name = contactDraft.displayName.trim();
-    const id = contactDraft.providerUserId.trim();
-    if (!name || !id) return;
-    setContactSaving(true);
+  async function saveContact(payload: { displayName: string; provider: string; providerUserId: string; label?: string | null; personId?: string | null }) {
     setContactError("");
     try {
       await api<IdentifyPersonResponse>("/api/people/identify", {
         method: "POST",
-        body: JSON.stringify({
-          displayName: name,
-          provider: "gchat",
-          providerUserId: id,
-          personId: contactDraft.personId.trim() || null,
-          label: null,
-        }),
+        body: JSON.stringify(payload),
       });
-      setContactDraft(null);
+      setContactPopoverOpen(false);
+      setContactPreset(null);
       await refreshPeople();
     } catch (e: any) {
       setContactError(String(e?.message || e));
-    } finally {
-      setContactSaving(false);
     }
   }
 
@@ -461,6 +448,9 @@ export function TriagePage({
     if (src?.provider === "gchat" && src?.space) {
       const alias = aliasMap[String(src.space)];
       if (alias?.displayName) return `Chat: ${alias.displayName}`;
+      const spaceInfo = spaceMap[String(src.space)];
+      if (spaceInfo?.spaceType === "DIRECT_MESSAGE") return "Direct chat";
+      if (spaceInfo?.displayName) return `Chat: ${spaceInfo.displayName}`;
     }
     return item.title;
   }
@@ -472,7 +462,7 @@ export function TriagePage({
       const known = peopleMap[`gchat:${userId}`];
       if (known) return known;
     }
-    return userId ? `Unknown (${userId})` : "Unknown";
+    return userId ? `Direct chat (${userId})` : "Direct chat";
   }
 
   const selectedHeader = useMemo(() => {
@@ -713,32 +703,6 @@ export function TriagePage({
               {selectedHeader}
               {selectedSpace ? (
                 <>
-                  <div className="settingsDivider" />
-                  <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>Direct chat contact</div>
-                  <div className="muted">Set a friendly name for this direct message space.</div>
-                  <div className="row wrap">
-                    <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
-                      <div className="muted">Contact name</div>
-                      <input
-                        className="input"
-                        value={aliasName}
-                        onChange={(e) => setAliasName(e.target.value)}
-                        placeholder="Contact Name"
-                      />
-                    </label>
-                    {aliasUserId ? <div className="muted" style={{ alignSelf: "flex-end" }}>User id: {aliasUserId}</div> : null}
-                    <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
-                      <button className="btn secondary" onClick={() => void saveAlias()} disabled={aliasSaving || !aliasName.trim()}>
-                        {aliasSaving ? "Saving..." : "Save name"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="muted">Space: {selectedSpace}</div>
-                </>
-              ) : null}
-              <div className="settingsDivider" />
-              {selectedSpace ? (
-                <>
                   <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>
                     <Circle size={14} /> Chat thread (last 3 months)
                   </div>
@@ -760,7 +724,10 @@ export function TriagePage({
                           {!m.sender?.displayName && m.sender?.name && !peopleMap[`gchat:${m.sender.name}`] ? (
                             <button
                               className="btn secondary tiny"
-                              onClick={() => setContactDraft({ displayName: "", providerUserId: m.sender?.name || "", personId: "" })}
+                              onClick={() => {
+                                setContactPreset({ displayName: "", providerUserId: m.sender?.name || "" });
+                                setContactPopoverOpen(true);
+                              }}
                             >
                               Add contact
                             </button>
@@ -771,44 +738,7 @@ export function TriagePage({
                   ) : (
                     <div className="muted">No recent messages in the last 3 months.</div>
                   )}
-                  {contactDraft ? (
-                    <div className="row wrap" style={{ marginTop: 10 }}>
-                      <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
-                        <div className="muted">Contact name</div>
-                        <input
-                          className="input"
-                          value={contactDraft.displayName}
-                          onChange={(e) => setContactDraft({ ...contactDraft, displayName: e.target.value })}
-                          placeholder="Contact Name"
-                        />
-                      </label>
-                      <label style={{ display: "grid", gap: 6, minWidth: 200 }}>
-                        <div className="muted">Attach to existing</div>
-                        <select
-                          className="input"
-                          value={contactDraft.personId}
-                          onChange={(e) => setContactDraft({ ...contactDraft, personId: e.target.value })}
-                        >
-                          <option value="">New contact</option>
-                          {people.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label style={{ display: "grid", gap: 6, minWidth: 260 }}>
-                        <div className="muted">User id</div>
-                        <input className="input" value={contactDraft.providerUserId} readOnly />
-                      </label>
-                      <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
-                        <button className="btn secondary" onClick={() => void saveContact()} disabled={contactSaving || !contactDraft.displayName.trim()}>
-                          {contactSaving ? "Saving..." : "Save contact"}
-                        </button>
-                      </div>
-                      {contactError ? <div className="muted">Error: {contactError}</div> : null}
-                    </div>
-                  ) : null}
+                  {contactError ? <div className="muted">Error: {contactError}</div> : null}
                   <div className="settingsDivider" />
                 </>
               ) : null}
@@ -847,6 +777,21 @@ export function TriagePage({
           )}
         </div>
       </div>
+
+      <ContactPopover
+        open={contactPopoverOpen}
+        onClose={() => {
+          setContactPopoverOpen(false);
+          setContactPreset(null);
+        }}
+        people={people}
+        presetDisplayName={contactPreset?.displayName || ""}
+        presetProvider="gchat"
+        presetProviderUserId={contactPreset?.providerUserId || ""}
+        onSaved={async (payload) => {
+          await saveContact(payload);
+        }}
+      />
     </div>
   );
 }

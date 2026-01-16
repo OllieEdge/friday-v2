@@ -4,7 +4,9 @@ const { nowIso } = require("../../utils/time");
 function createPeopleQueries(db) {
   function listPeople() {
     const people = db
-      .prepare("SELECT id, display_name AS displayName, notes, created_at AS createdAt, updated_at AS updatedAt FROM people ORDER BY updated_at DESC;")
+      .prepare(
+        "SELECT id, display_name AS displayName, notes, is_me AS isMe, created_at AS createdAt, updated_at AS updatedAt FROM people ORDER BY updated_at DESC;",
+      )
       .all();
     const identities = db
       .prepare(
@@ -62,7 +64,7 @@ function createPeopleQueries(db) {
     }
 
     const person = db
-      .prepare("SELECT id, display_name AS displayName, notes, created_at AS createdAt, updated_at AS updatedAt FROM people WHERE id = ?;")
+      .prepare("SELECT id, display_name AS displayName, notes, is_me AS isMe, created_at AS createdAt, updated_at AS updatedAt FROM people WHERE id = ?;")
       .get(pid);
     const identities = db
       .prepare(
@@ -192,7 +194,65 @@ function createPeopleQueries(db) {
     };
   }
 
-  return { listPeople, upsertIdentity, listSpaceAliases, upsertSpaceAlias };
+  function updatePerson({ personId, displayName, isMe = null, notes = null }) {
+    const pid = String(personId || "").trim();
+    if (!pid) return null;
+    const now = nowIso();
+    const name = displayName == null ? null : String(displayName || "").trim();
+    const note = notes == null ? null : String(notes || "").trim();
+    if (name != null) {
+      db.prepare("UPDATE people SET display_name = ?, notes = COALESCE(?, notes), updated_at = ? WHERE id = ?;").run(
+        name,
+        note,
+        now,
+        pid,
+      );
+    } else if (note != null) {
+      db.prepare("UPDATE people SET notes = ?, updated_at = ? WHERE id = ?;").run(note, now, pid);
+    }
+    if (isMe != null) {
+      db.exec("BEGIN;");
+      try {
+        if (isMe) {
+          db.prepare("UPDATE people SET is_me = 0;").run();
+          db.prepare("UPDATE people SET is_me = 1, updated_at = ? WHERE id = ?;").run(now, pid);
+        } else {
+          db.prepare("UPDATE people SET is_me = 0, updated_at = ? WHERE id = ?;").run(now, pid);
+        }
+        db.exec("COMMIT;");
+      } catch (e) {
+        db.exec("ROLLBACK;");
+        throw e;
+      }
+    }
+    return db
+      .prepare("SELECT id, display_name AS displayName, notes, is_me AS isMe, created_at AS createdAt, updated_at AS updatedAt FROM people WHERE id = ?;")
+      .get(pid);
+  }
+
+  function deletePerson({ personId }) {
+    const pid = String(personId || "").trim();
+    if (!pid) return false;
+    db.prepare("DELETE FROM people WHERE id = ?;").run(pid);
+    return true;
+  }
+
+  function deleteIdentity({ identityId }) {
+    const id = String(identityId || "").trim();
+    if (!id) return false;
+    db.prepare("DELETE FROM person_identities WHERE id = ?;").run(id);
+    return true;
+  }
+
+  return {
+    listPeople,
+    upsertIdentity,
+    updatePerson,
+    deletePerson,
+    deleteIdentity,
+    listSpaceAliases,
+    upsertSpaceAlias,
+  };
 }
 
 module.exports = { createPeopleQueries };

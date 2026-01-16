@@ -1,19 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { IdentifyPersonResponse, PeopleResponse, PersonRecord } from "../api/types";
-
-type ProviderOption = "gchat" | "email" | "slack" | "custom";
+import type {
+  BootstrapMeResponse,
+  DeleteIdentityResponse,
+  DeletePersonResponse,
+  IdentifyPersonResponse,
+  PeopleResponse,
+  PersonRecord,
+  UpdatePersonResponse,
+} from "../api/types";
+import { ContactPopover } from "./contacts/ContactPopover";
 
 export function ContactsPage() {
   const [people, setPeople] = useState<PersonRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [displayName, setDisplayName] = useState("");
-  const [provider, setProvider] = useState<ProviderOption>("gchat");
-  const [providerUserId, setProviderUserId] = useState("");
-  const [label, setLabel] = useState("");
-  const [personId, setPersonId] = useState("");
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPersonId, setEditPersonId] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
@@ -29,26 +33,84 @@ export function ContactsPage() {
     }
   }
 
-  async function saveIdentity() {
-    const name = displayName.trim();
-    const id = providerUserId.trim();
-    if (!name || !id) return;
+  async function saveName() {
+    if (!editPersonId || !editName.trim()) return;
+    setSaving(true);
+    try {
+      await api<UpdatePersonResponse>(`/api/people/${editPersonId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ displayName: editName.trim() }),
+      });
+      setEditName("");
+      setEditPersonId("");
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function setMe(personId: string) {
+    setSaving(true);
+    try {
+      await api<UpdatePersonResponse>(`/api/people/${personId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isMe: true }),
+      });
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deletePerson(personId: string) {
+    if (!personId) return;
+    setSaving(true);
+    try {
+      await api<DeletePersonResponse>(`/api/people/${personId}`, { method: "DELETE" });
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteIdentity(identityId: string) {
+    if (!identityId) return;
+    setSaving(true);
+    try {
+      await api<DeleteIdentityResponse>(`/api/people/identities/${identityId}`, { method: "DELETE" });
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addIdentity(payload: { displayName: string; provider: string; providerUserId: string; label?: string | null; personId?: string | null }) {
     setSaving(true);
     try {
       await api<IdentifyPersonResponse>("/api/people/identify", {
         method: "POST",
-        body: JSON.stringify({
-          personId: personId.trim() || null,
-          displayName: name,
-          provider,
-          providerUserId: id,
-          label: label.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
-      setDisplayName("");
-      setProviderUserId("");
-      setLabel("");
-      setPersonId("");
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function bootstrapMe() {
+    setSaving(true);
+    try {
+      await api<BootstrapMeResponse>("/api/people/bootstrap-me", { method: "POST", body: JSON.stringify({}) });
       await refresh();
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -61,10 +123,7 @@ export function ContactsPage() {
     void refresh();
   }, []);
 
-  const peopleOptions = useMemo(
-    () => people.map((p) => ({ id: p.id, label: p.displayName })),
-    [people],
-  );
+  const me = useMemo(() => people.find((p) => p.isMe), [people]);
 
   return (
     <div className="contactsShell">
@@ -76,53 +135,13 @@ export function ContactsPage() {
         <div className="muted">Store people + identifiers (gchat, email, slack, etc).</div>
         <div className="settingsDivider" />
         <div className="row wrap">
-          <label style={{ display: "grid", gap: 6, minWidth: 200 }}>
-            <div className="muted">Display name</div>
-            <input
-              className="input"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Contact Name"
-            />
-          </label>
-          <label style={{ display: "grid", gap: 6, minWidth: 140 }}>
-            <div className="muted">Provider</div>
-            <select className="input" value={provider} onChange={(e) => setProvider(e.target.value as ProviderOption)}>
-              <option value="gchat">gchat</option>
-              <option value="email">email</option>
-              <option value="slack">slack</option>
-              <option value="custom">custom</option>
-            </select>
-          </label>
-          <label style={{ display: "grid", gap: 6, minWidth: 220 }}>
-            <div className="muted">Identifier</div>
-            <input
-              className="input"
-              value={providerUserId}
-              onChange={(e) => setProviderUserId(e.target.value)}
-              placeholder="users/123… or name@example.com"
-            />
-          </label>
-          <label style={{ display: "grid", gap: 6, minWidth: 160 }}>
-            <div className="muted">Label (optional)</div>
-            <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Work" />
-          </label>
-          <label style={{ display: "grid", gap: 6, minWidth: 200 }}>
-            <div className="muted">Attach to existing</div>
-            <select className="input" value={personId} onChange={(e) => setPersonId(e.target.value)}>
-              <option value="">New contact</option>
-              {peopleOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div style={{ display: "grid", gap: 6, alignSelf: "flex-end" }}>
-            <button className="btn secondary" onClick={() => void saveIdentity()} disabled={saving || !displayName.trim() || !providerUserId.trim()}>
-              {saving ? "Saving..." : "Save contact"}
-            </button>
-          </div>
+          <button className="btn secondary" onClick={() => setPopoverOpen(true)}>
+            Add contact
+          </button>
+          <button className="btn" onClick={() => void bootstrapMe()} disabled={saving}>
+            Use account info
+          </button>
+          {me ? <span className="pill">Me: {me.displayName}</span> : <span className="muted">No “me” contact set.</span>}
         </div>
         {error ? <div className="muted">Error: {error}</div> : null}
       </div>
@@ -135,15 +154,47 @@ export function ContactsPage() {
             <div key={person.id} className="settingsCard">
               <div className="settingsCardTitleRow">
                 <div style={{ fontWeight: 800 }}>{person.displayName}</div>
+                {person.isMe ? <span className="pill">me</span> : null}
               </div>
               <div className="muted">Updated {new Date(person.updatedAt).toLocaleString()}</div>
+              <div className="settingsDivider" />
+              <div className="row wrap">
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setEditPersonId(person.id);
+                    setEditName(person.displayName);
+                  }}
+                >
+                  Edit name
+                </button>
+                <button className="btn secondary" onClick={() => setMe(person.id)} disabled={saving}>
+                  Set as me
+                </button>
+                <button className="btn danger" onClick={() => deletePerson(person.id)} disabled={saving}>
+                  Delete
+                </button>
+              </div>
+              {editPersonId === person.id ? (
+                <div className="row wrap" style={{ marginTop: 8 }}>
+                  <input className="input" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Contact Name" />
+                  <button className="btn secondary" onClick={() => void saveName()} disabled={saving || !editName.trim()}>
+                    {saving ? "Saving..." : "Save name"}
+                  </button>
+                </div>
+              ) : null}
               <div className="settingsDivider" />
               <div className="contactsIdentities">
                 {(person.identities || []).map((ident) => (
                   <div key={ident.id} className="contactsIdentity">
                     <div style={{ fontWeight: 700 }}>{ident.provider}</div>
                     <div className="muted">{ident.providerUserId}</div>
-                    {ident.label ? <div className="pill">{ident.label}</div> : null}
+                    <div className="row wrap">
+                      {ident.label ? <div className="pill">{ident.label}</div> : null}
+                      <button className="btn tiny" onClick={() => deleteIdentity(ident.id)} disabled={saving}>
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {person.identities?.length ? null : <div className="muted">No identifiers yet.</div>}
@@ -154,6 +205,16 @@ export function ContactsPage() {
           <div className="muted">No contacts yet.</div>
         )}
       </div>
+
+      <ContactPopover
+        open={popoverOpen}
+        onClose={() => setPopoverOpen(false)}
+        people={people}
+        onSaved={async (payload) => {
+          await addIdentity(payload);
+          setPopoverOpen(false);
+        }}
+      />
     </div>
   );
 }

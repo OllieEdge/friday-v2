@@ -267,6 +267,7 @@ export type PersonRecord = {
   id: string;
   displayName: string;
   notes: string | null;
+  isMe: boolean;
   createdAt: string;
   updatedAt: string;
   identities: PersonIdentity[];
@@ -280,6 +281,37 @@ export type PeopleResponse = {
 export type IdentifyPersonResponse = {
   ok: true;
   person: PersonRecord;
+};
+
+export type UpdatePersonResponse = {
+  ok: true;
+  person: PersonRecord;
+};
+
+export type DeletePersonResponse = {
+  ok: true;
+};
+
+export type DeleteIdentityResponse = {
+  ok: true;
+};
+
+export type BootstrapMeResponse = {
+  ok: true;
+  person: PersonRecord;
+};
+
+export type GchatSpaceInfo = {
+  spaceId: string;
+  displayName: string;
+  spaceType: string;
+  type: string;
+  error?: string;
+};
+
+export type GchatSpacesResponse = {
+  ok: true;
+  spaces: GchatSpaceInfo[];
 };
 
 export type RunbookSummary = {

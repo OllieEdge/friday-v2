@@ -102,6 +102,33 @@ async function fetchChatThread({ spaceId, googleAccounts, accountKey = "work", m
   }));
 }
 
+async function fetchChatSpaces({ spaceIds, googleAccounts, accountKey = "work" }) {
+  const accessToken = await getAccessToken({ googleAccounts, accountKey });
+  const out = [];
+  for (const spaceId of spaceIds) {
+    const url = `https://chat.googleapis.com/v1/${spaceId}`;
+    const res = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+    const txt = await res.text();
+    let json = null;
+    try {
+      json = JSON.parse(txt);
+    } catch {
+      json = null;
+    }
+    if (!res.ok) {
+      out.push({ spaceId, error: json?.error?.message || txt || `HTTP ${res.status}` });
+      continue;
+    }
+    out.push({
+      spaceId,
+      displayName: json?.displayName || "",
+      spaceType: json?.spaceType || "",
+      type: json?.type || "",
+    });
+  }
+  return out;
+}
+
 function registerPeople(router, { people, googleAccounts }) {
   router.add("GET", "/api/people", async (_req, res) => {
     const list = people.listPeople();
@@ -121,6 +148,71 @@ function registerPeople(router, { people, googleAccounts }) {
     const person = people.upsertIdentity({ personId, displayName, provider, providerUserId, label });
     if (!person) return sendJson(res, 400, { ok: false, error: "invalid_identity" });
     return sendJson(res, 200, { ok: true, person });
+  });
+
+  router.add("POST", "/api/people/bootstrap-me", async (req, res) => {
+    const body = (await readJson(req)) || {};
+    const displayName = body?.displayName == null ? null : String(body.displayName).trim();
+    const accounts = googleAccounts?.list ? googleAccounts.list() : [];
+    const emails = accounts.map((a) => String(a.email || "").trim()).filter(Boolean);
+    if (emails.length === 0) return sendJson(res, 400, { ok: false, error: "no_accounts" });
+
+    const existingMe = people.listPeople().find((p) => p.isMe);
+    let personId = existingMe?.id || null;
+    const baseName = displayName || (emails[0].split("@")[0] || "Me");
+
+    if (!personId) {
+      const created = people.upsertIdentity({
+        personId: null,
+        displayName: baseName,
+        provider: "email",
+        providerUserId: emails[0],
+        label: "work",
+      });
+      personId = created?.id || null;
+    } else {
+      people.updatePerson({ personId, displayName: baseName });
+    }
+
+    if (!personId) return sendJson(res, 500, { ok: false, error: "create_failed" });
+
+    for (const email of emails) {
+      people.upsertIdentity({
+        personId,
+        displayName: baseName,
+        provider: "email",
+        providerUserId: email,
+        label: "work",
+      });
+    }
+    const person = people.updatePerson({ personId, isMe: true, displayName: baseName });
+    return sendJson(res, 200, { ok: true, person });
+  });
+
+  router.add("PATCH", "/api/people/:personId", async (req, res, _url, params) => {
+    const body = (await readJson(req)) || {};
+    const personId = String(params.personId || "").trim();
+    if (!personId) return sendJson(res, 400, { ok: false, error: "missing_person" });
+    const displayName = body?.displayName == null ? null : String(body.displayName);
+    const notes = body?.notes == null ? null : String(body.notes);
+    const isMe = body?.isMe == null ? null : Boolean(body.isMe);
+    const person = people.updatePerson({ personId, displayName, notes, isMe });
+    if (!person) return sendJson(res, 404, { ok: false, error: "not_found" });
+    return sendJson(res, 200, { ok: true, person });
+  });
+
+  router.add("DELETE", "/api/people/:personId", async (_req, res, _url, params) => {
+    const personId = String(params.personId || "").trim();
+    if (!personId) return sendJson(res, 400, { ok: false, error: "missing_person" });
+    const ok = people.deletePerson({ personId });
+    return sendJson(res, 200, { ok });
+  });
+
+  router.add("DELETE", "/api/people/identities/:identityId", async (_req, res, _url, params) => {
+    const identityId = String(params.identityId || "").trim();
+    if (!identityId) return sendJson(res, 400, { ok: false, error: "missing_identity" });
+    const ok = people.deleteIdentity({ identityId });
+    return sendJson(res, 200, { ok });
   });
 
   router.add("POST", "/api/people/aliases/resolve", async (req, res) => {
@@ -175,6 +267,20 @@ function registerPeople(router, { people, googleAccounts }) {
       return sendJson(res, 200, { ok: true, messages });
     } catch (e) {
       return sendJson(res, e.statusCode || 500, { ok: false, error: "thread_lookup_failed", message: String(e?.message || e) });
+    }
+  });
+
+  router.add("POST", "/api/people/gchat/spaces", async (req, res) => {
+    if (!googleAccounts) return sendJson(res, 400, { ok: false, error: "google_unavailable" });
+    const body = (await readJson(req)) || {};
+    const accountKey = String(body?.accountKey || "work").trim() || "work";
+    const spaceIds = Array.isArray(body?.spaceIds) ? body.spaceIds.map((s) => String(s || "").trim()).filter(Boolean) : [];
+    if (spaceIds.length === 0) return sendJson(res, 400, { ok: false, error: "missing_space_ids" });
+    try {
+      const spaces = await fetchChatSpaces({ spaceIds, googleAccounts, accountKey });
+      return sendJson(res, 200, { ok: true, spaces });
+    } catch (e) {
+      return sendJson(res, e.statusCode || 500, { ok: false, error: "spaces_lookup_failed", message: String(e?.message || e) });
     }
   });
 }
