@@ -85,7 +85,7 @@ export function TriagePage({
   const [selected, setSelected] = useState<TriageItem | null>(null);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [aliasMap, setAliasMap] = useState<Record<string, PersonAlias>>({});
-  const [aliasUserId, setAliasUserId] = useState("");
+  const [aliasUserIdBySpace, setAliasUserIdBySpace] = useState<Record<string, string>>({});
   const [aliasLookupBusy, setAliasLookupBusy] = useState(false);
   const [lastSenderLookup, setLastSenderLookup] = useState("");
   const [threadMessages, setThreadMessages] = useState<GchatThreadMessage[]>([]);
@@ -214,22 +214,20 @@ export function TriagePage({
           .map((src) => String(src.space)),
       ),
     );
-    if (spaceIds.length === 0) {
-      setSpaceMap({});
-      return;
-    }
+    if (spaceIds.length === 0) return;
+    const missing = spaceIds.filter((id) => !spaceMap[id]);
+    if (missing.length === 0) return;
     try {
       const res = await api<GchatSpacesResponse>("/api/people/gchat/spaces", {
         method: "POST",
-        body: JSON.stringify({ spaceIds, accountKey: "work" }),
+        body: JSON.stringify({ spaceIds: missing, accountKey: "work" }),
       });
       const next: Record<string, { displayName: string; spaceType: string }> = {};
       for (const space of res.spaces || []) {
         if (space?.spaceId) next[space.spaceId] = { displayName: space.displayName || "", spaceType: space.spaceType || "" };
       }
-      setSpaceMap(next);
+      setSpaceMap((prev) => ({ ...prev, ...next }));
     } catch {
-      setSpaceMap({});
     }
   }
 
@@ -362,20 +360,20 @@ export function TriagePage({
   const selectedSpace = selected?.source?.provider === "gchat" ? String(selected?.source?.space || "") : "";
   const selectedMessage = selected?.source?.provider === "gchat" ? String(selected?.source?.message || "") : "";
   const selectedAlias = selectedSpace ? aliasMap[selectedSpace] : null;
+  const selectedUserId = selectedSpace ? aliasUserIdBySpace[selectedSpace] || selectedAlias?.providerUserId || "" : "";
 
   useEffect(() => {
-    if (!selectedSpace) {
-      setAliasUserId("");
-      return;
-    }
-    setAliasUserId(selectedAlias?.providerUserId || "");
-  }, [selectedSpace, selectedAlias?.displayName, selectedAlias?.providerUserId]);
+    if (!selectedSpace) return;
+    const known = selectedAlias?.providerUserId || "";
+    if (!known) return;
+    setAliasUserIdBySpace((prev) => (prev[selectedSpace] ? prev : { ...prev, [selectedSpace]: known }));
+  }, [selectedSpace, selectedAlias?.providerUserId]);
 
   useEffect(() => {
-    if (!selectedSpace || !aliasUserId) return;
+    if (!selectedSpace || !selectedUserId) return;
     if (selectedAlias?.displayName) return;
     if (autoAliasedSpaces[selectedSpace]) return;
-    const known = peopleMap[`gchat:${aliasUserId}`];
+    const known = peopleMap[`gchat:${selectedUserId}`];
     if (!known) return;
     setAutoAliasedSpaces((prev) => ({ ...prev, [selectedSpace]: true }));
     api<UpsertAliasResponse>("/api/people/aliases", {
@@ -384,16 +382,16 @@ export function TriagePage({
         provider: "gchat",
         spaceId: selectedSpace,
         displayName: known,
-        providerUserId: aliasUserId.trim() || null,
+        providerUserId: selectedUserId.trim() || null,
       }),
     })
       .then((res) => setAliasMap((prev) => ({ ...prev, [selectedSpace]: res.alias })))
       .catch(() => {});
-  }, [selectedSpace, aliasUserId, selectedAlias?.displayName, autoAliasedSpaces, peopleMap]);
+  }, [selectedSpace, selectedUserId, selectedAlias?.displayName, autoAliasedSpaces, peopleMap]);
 
   useEffect(() => {
     if (!selectedSpace || !selectedMessage) return;
-    if (aliasUserId || selectedAlias?.providerUserId || aliasLookupBusy) return;
+    if (selectedUserId || selectedAlias?.providerUserId || aliasLookupBusy) return;
     if (lastSenderLookup === selectedMessage) return;
     setAliasLookupBusy(true);
     api<GchatSenderResponse>("/api/people/gchat/sender", {
@@ -402,14 +400,16 @@ export function TriagePage({
     })
       .then((res) => {
         const userId = res?.sender?.senderUserId || "";
-        if (userId) setAliasUserId(userId);
+        if (userId) {
+          setAliasUserIdBySpace((prev) => ({ ...prev, [selectedSpace]: userId }));
+        }
       })
       .catch(() => {})
       .finally(() => {
         setLastSenderLookup(selectedMessage);
         setAliasLookupBusy(false);
       });
-  }, [selectedSpace, selectedMessage, aliasUserId, selectedAlias?.providerUserId, aliasLookupBusy, lastSenderLookup]);
+  }, [selectedSpace, selectedMessage, selectedUserId, selectedAlias?.providerUserId, aliasLookupBusy, lastSenderLookup]);
 
   useEffect(() => {
     if (!selectedSpace) {
@@ -435,6 +435,19 @@ export function TriagePage({
         method: "POST",
         body: JSON.stringify(payload),
       });
+      if (selectedSpace && payload.provider === "gchat" && payload.providerUserId) {
+        const res = await api<UpsertAliasResponse>("/api/people/aliases", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: "gchat",
+            spaceId: selectedSpace,
+            displayName: payload.displayName,
+            providerUserId: payload.providerUserId,
+          }),
+        });
+        setAliasMap((prev) => ({ ...prev, [selectedSpace]: res.alias }));
+        setAliasUserIdBySpace((prev) => ({ ...prev, [selectedSpace]: payload.providerUserId }));
+      }
       setContactPopoverOpen(false);
       setContactPreset(null);
       await refreshPeople();
@@ -462,7 +475,7 @@ export function TriagePage({
       const known = peopleMap[`gchat:${userId}`];
       if (known) return known;
     }
-    return userId ? `Direct chat (${userId})` : "Direct chat";
+    return userId ? "Direct chat" : "Direct chat";
   }
 
   const selectedHeader = useMemo(() => {
