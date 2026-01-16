@@ -59,7 +59,7 @@ async function fetchChatThread({ spaceId, googleAccounts, accountKey = "work", m
   while (keepGoing) {
     const qs = new URLSearchParams({
       pageSize: "100",
-      orderBy: "CREATE_TIME_DESC",
+      orderBy: "createTime desc",
     });
     if (pageToken) qs.set("pageToken", pageToken);
     const url = `https://chat.googleapis.com/v1/${spaceId}/messages?${qs.toString()}`;
