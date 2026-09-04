@@ -6,9 +6,12 @@
     "server"
   ],
   "scripts": {
+    "capabilities:build": "node tools/ops/generate-friday-endpoint-registry.mjs",
+    "capabilities:check": "node tools/ops/generate-friday-endpoint-registry.mjs --check",
     "dev:web": "npm -w apps/web run dev",
     "dev:server": "npm -w server run dev",
     "build": "npm -w apps/web run build",
+    "flows:validate": "node tools/ops/validate-flow-registry.mjs",
     "start": "npm -w server run start",
     "test:e2e": "playwright test",
     "test:unit": "node --test server/test/*.test.js"

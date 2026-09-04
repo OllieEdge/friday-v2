@@ -28,6 +28,11 @@ cursor_strategy: gmail_history_id
 Notes
 - `every_minutes` is the only schedule supported right now.
 - Cursors (e.g. Gmail `historyId`) are stored in SQLite per-runbook per-account to avoid reprocessing.
+- Manual run behavior:
+  - `POST /api/runbooks/:runbookId/run-now` executes immediately and returns `started` + per-account `results`.
+  - Each run now has a hard timeout (`RUNBOOK_ASSISTANT_TIMEOUT_MS`, default 180000ms) to avoid stuck `running` tasks.
+- Health interpretation:
+  - Disabled runbooks should not drive Ops to `critical`; only enabled runbooks should count as runbook blockers.
 
 Creating a runbook via chat
 - You can create a new runbook by writing a new Markdown file under `runbooks/automation/`.

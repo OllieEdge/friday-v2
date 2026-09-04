@@ -16,6 +16,29 @@ const { sizeProject } = require("../lib/sizing");
 const { summarizeText } = require("../lib/summarizer");
 const { normalizeText, parseCardIdFromUrl, mergeSizingIntoDesc } = require("../lib/pm-utils");
 
+function normalizeLane(value) {
+  const v = String(value || "")
+    .trim()
+    .replace(/[-\s]+/g, "")
+    .toLowerCase();
+  if (v === "triage") return "triage";
+  if (v === "planning" || v === "plan") return "planning";
+  if (v === "coding" || v === "code") return "coding";
+  if (v === "highrisk" || v === "risk") return "highRisk";
+  if (v === "ops" || v === "operations") return "ops";
+  return "";
+}
+
+function inferLane({ lane, content, title }) {
+  const explicit = normalizeLane(lane);
+  if (explicit) return explicit;
+  const haystack = `${String(title || "")}\n${String(content || "")}`.toLowerCase();
+  if (/(microsoft|graph\.microsoft|azure|outlook|family safety|tenant)/.test(haystack)) return "ops";
+  if (/(gmail|email|inbox|triage|draft|reply)/.test(haystack)) return "triage";
+  if (/(typescript|javascript|bug|fix|build|compile|deploy|refactor|code)/.test(haystack)) return "coding";
+  return "planning";
+}
+
 function pruneInactive({ pmProjects, projectId }) {
   const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   pmProjects.removeInactiveWorkers({ projectId, before: cutoff });
@@ -111,7 +134,7 @@ function registerPmProjects(router, { pmProjects, chats, tasks, settings, google
     const content = String(body?.content ?? "");
     const source = normalizeText(body?.source) || "human";
     const workerId = normalizeText(body?.workerId);
-    const lane = normalizeText(body?.lane);
+    const lane = inferLane({ lane: body?.lane, content, title: project.title });
 
     const roleLabel = source === "worker" ? (workerId ? `Worker (${workerId})` : "Worker") : "Oliver";
     const userMsg = chats.appendMessage({
@@ -122,7 +145,7 @@ function registerPmProjects(router, { pmProjects, chats, tasks, settings, google
     });
     if (!userMsg) return sendJson(res, 404, { ok: false, error: "chat_not_found" });
 
-    const task = tasks.create({ kind: "pm_chat_run", input: { chatId: project.chatId, projectId: project.id, source } });
+    const task = tasks.create({ kind: "pm_chat_run", input: { chatId: project.chatId, projectId: project.id, source, lane } });
     const assistantMeta = { roleLabel: "PM", run: { taskId: task.id, status: "running", startedAt: new Date().toISOString() } };
     const assistantMsg = chats.appendMessage({ chatId: project.chatId, role: "assistant", content: "Thinking…", meta: assistantMeta });
     if (assistantMsg) {

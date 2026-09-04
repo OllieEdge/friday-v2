@@ -38,6 +38,29 @@ function normalizeText(value) {
   return String(value ?? "").trim();
 }
 
+function normalizeLane(value) {
+  const v = String(value || "")
+    .trim()
+    .replace(/[-\s]+/g, "")
+    .toLowerCase();
+  if (v === "triage") return "triage";
+  if (v === "planning" || v === "plan") return "planning";
+  if (v === "coding" || v === "code") return "coding";
+  if (v === "highrisk" || v === "risk") return "highRisk";
+  if (v === "ops" || v === "operations") return "ops";
+  return "planning";
+}
+
+const PM_CONTEXT_FILES = [
+  "pm.md",
+  "13_CAPABILITIES.md",
+  "22_HOME_OPS.md",
+  "26_TOOLS_CATALOG.md",
+  "55_VERTEX_GEMINI.md",
+  "63_MICROSOFT.md",
+  "64_MICROSOFT_HTTP_REQUEST_TOOL.md",
+];
+
 function extractSlackReply(text) {
   const raw = String(text || "");
   const match = raw.match(/```slack_reply\s*([\s\S]*?)```/i);
@@ -181,10 +204,18 @@ function loadContext() {
 }
 
 function loadPmContext() {
-  const pmPath = path.join(CONTEXT_DIR, "pm.md");
-  if (!fs.existsSync(pmPath)) return loadContext();
-  const content = fs.readFileSync(pmPath, "utf8");
-  return { dir: CONTEXT_DIR, files: ["pm.md"], items: [{ filename: "pm.md", content }] };
+  const files = [];
+  const items = [];
+  for (const filename of PM_CONTEXT_FILES) {
+    const fullPath = path.join(CONTEXT_DIR, filename);
+    if (!fs.existsSync(fullPath)) continue;
+    const content = fs.readFileSync(fullPath, "utf8");
+    if (!String(content || "").trim()) continue;
+    files.push(filename);
+    items.push({ filename, content });
+  }
+  if (!items.length) return loadContext();
+  return { dir: CONTEXT_DIR, files, items };
 }
 
 function getActiveCodexProfile() {
@@ -245,6 +276,7 @@ async function maybeRefreshPmTitle({ project, chat }) {
 async function runChatTask({ task }) {
   const chatId = task?.input?.chatId;
   const assistantMessageId = task?.input?.assistantMessageId;
+  const lane = normalizeLane(task?.input?.lane);
   if (!chatId || !assistantMessageId) {
     tasks.appendEvent({ taskId: task.id, event: { type: "error", message: "Invalid task input (missing chatId/assistantMessageId)." } });
     tasks.setStatus({ taskId: task.id, status: "error", completedAt: new Date().toISOString() });
@@ -265,6 +297,7 @@ async function runChatTask({ task }) {
       context,
       chat,
       googleAccounts,
+      routingHint: { lane },
       onEvent: (ev) => {
         tasks.appendEvent({ taskId: task.id, event: ev });
         chats.appendMessageEvent({ messageId: assistantMessageId, event: ev });
@@ -276,7 +309,7 @@ async function runChatTask({ task }) {
 
     const assistantContent = String(result?.content || "");
     const doneMeta = {
-      roleLabel: "PM",
+      roleLabel: "Friday",
       run: {
         taskId: task.id,
         status: "done",
@@ -300,7 +333,7 @@ async function runChatTask({ task }) {
   } catch (e) {
     const msg = `Runner error: ${String(e?.message || e)}`;
     const errorMeta = {
-      roleLabel: "PM",
+      roleLabel: "Friday",
       run: {
         taskId: task.id,
         status: "error",
@@ -357,6 +390,7 @@ async function runSlackAutoReplyTask({ task }) {
       context,
       chat,
       googleAccounts,
+      routingHint: { lane: "triage" },
       onEvent: (ev) => tasks.appendEvent({ taskId: task.id, event: ev }),
       getActiveCodexProfile,
       getCodexRunnerPrefs,
@@ -421,10 +455,12 @@ async function runPmChatTask({ task }) {
 
   try {
     const chat = chats.getChat(chatId);
+    const lane = normalizeLane(task?.input?.lane);
     const result = await runAssistant({
       context,
       chat,
       googleAccounts,
+      routingHint: { lane },
       onEvent: (ev) => {
         tasks.appendEvent({ taskId: task.id, event: ev });
         chats.appendMessageEvent({ messageId: assistantMessageId, event: ev });
@@ -554,6 +590,7 @@ async function runPmCommandTask({ task }) {
       context,
       chat,
       googleAccounts,
+      routingHint: { lane: "coding" },
       onEvent: (ev) => tasks.appendEvent({ taskId: task.id, event: ev }),
       getActiveCodexProfile,
       getCodexRunnerPrefs,

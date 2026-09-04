@@ -141,7 +141,7 @@ textarea {
 
 .topbarLeft {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   min-width: 0;
 }
 
@@ -160,20 +160,34 @@ textarea {
   max-width: 70ch;
 }
 
-.activeAccount {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.chatMeta {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
 .topbarRight {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.mobileMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.56);
+  z-index: 44;
+}
+
+.mobileMenuPanel {
+  position: fixed;
+  top: 64px;
+  left: 12px;
+  right: 12px;
+  z-index: 45;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  padding: 10px;
+  display: none;
   gap: 8px;
 }
 
@@ -225,8 +239,18 @@ textarea {
 .triageMain {
   grid-area: messages;
   padding: 12px 16px;
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   min-height: 0;
+}
+
+.opsMainShell {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.flowMainShell {
+  overflow: auto;
 }
 
 .triageShell {
@@ -362,6 +386,34 @@ textarea {
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: end;
+}
+
+.triageDraftBox {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.triageDraftMeta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.triageDraftBody {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .msg {
@@ -985,6 +1037,53 @@ textarea {
   gap: 12px;
 }
 
+.modelSettingsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.modelRoutingGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.modelEditorCard {
+  min-width: 0;
+}
+
+.modelForm {
+  display: grid;
+  gap: 10px;
+}
+
+.modelChecks {
+  display: grid;
+  gap: 6px;
+}
+
+.modelCheck {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 12px;
+}
+
+.modelCheck.ok {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.modelCheck.fail {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.modelPersonaLanes {
+  display: grid;
+  gap: 8px;
+}
+
 .settingsCard {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1026,6 +1125,22 @@ textarea {
 
   .mobileOnly {
     display: inline-flex;
+  }
+
+  .topbar {
+    padding: 10px 12px;
+  }
+
+  .topbarRight {
+    display: none;
+  }
+
+  .chatTitle {
+    max-width: calc(100vw - 120px);
+  }
+
+  .mobileMenuPanel {
+    display: grid;
   }
 
   .sidebar {
@@ -1094,9 +1209,21 @@ textarea {
     border-right: none;
     border-bottom: 1px solid var(--border);
   }
+
+  .modelSettingsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modelRoutingGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
+  .topbar {
+    padding: 8px 10px;
+  }
+
   .composer {
     grid-template-columns: 1fr;
   }
@@ -1104,6 +1231,12 @@ textarea {
   .messages {
     padding: 12px 12px;
     scroll-padding-bottom: 12px;
+  }
+
+  .mobileMenuPanel {
+    top: 56px;
+    left: 8px;
+    right: 8px;
   }
 }
 
@@ -1389,5 +1522,770 @@ textarea {
 @media (max-width: 860px) {
   .pmWorkerRow {
     grid-template-columns: 1fr;
+  }
+}
+
+.opsMain {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.opsTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.16);
+  padding: 12px;
+}
+
+.opsTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.opsSub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.opsTopActions {
+  display: flex;
+  gap: 8px;
+}
+
+.opsInlineBadges {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opsHealthBadge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+
+  &.ok {
+    border-color: rgba(45, 212, 191, 0.55);
+    color: rgba(226, 255, 251, 0.96);
+    background: rgba(45, 212, 191, 0.14);
+  }
+
+  &.warn {
+    border-color: rgba(251, 191, 36, 0.6);
+    color: rgba(255, 244, 214, 0.98);
+    background: rgba(251, 191, 36, 0.16);
+  }
+
+  &.critical {
+    border-color: rgba(248, 113, 113, 0.7);
+    color: rgba(255, 232, 232, 0.98);
+    background: rgba(248, 113, 113, 0.16);
+  }
+}
+
+.opsBanner {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.opsBanner.error {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.opsKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.opsKpiBlock {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.opsKpiLabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.opsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opsCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.opsCardWide {
+  grid-column: 1 / -1;
+}
+
+.opsCard h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.opsCardHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.opsHealthList {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.opsHealthList > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opsMuted {
+  color: var(--muted);
+}
+
+.opsTableWrap {
+  overflow: auto;
+}
+
+.opsTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.opsTable th,
+.opsTable td {
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  font-size: 12px;
+  vertical-align: top;
+}
+
+.opsTable th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.opsFilterRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.opsMiniList {
+  display: grid;
+  gap: 6px;
+}
+
+.opsMiniItem {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.03);
+
+  &.warn {
+    border-color: rgba(248, 113, 113, 0.55);
+    background: rgba(248, 113, 113, 0.11);
+  }
+
+  &.info {
+    border-color: rgba(122, 162, 255, 0.5);
+    background: rgba(122, 162, 255, 0.11);
+  }
+}
+
+.opsStatePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  padding: 2px 8px;
+  min-width: 76px;
+
+  &.ok {
+    border-color: rgba(45, 212, 191, 0.6);
+    background: rgba(45, 212, 191, 0.14);
+  }
+
+  &.info {
+    border-color: rgba(122, 162, 255, 0.5);
+    background: rgba(122, 162, 255, 0.12);
+  }
+
+  &.pending {
+    border-color: rgba(250, 204, 21, 0.55);
+    background: rgba(250, 204, 21, 0.15);
+  }
+
+  &.warn {
+    border-color: rgba(251, 191, 36, 0.55);
+    background: rgba(251, 191, 36, 0.14);
+  }
+
+  &.critical {
+    border-color: rgba(248, 113, 113, 0.62);
+    background: rgba(248, 113, 113, 0.16);
+  }
+
+  &.degraded {
+    border-color: rgba(251, 191, 36, 0.55);
+    background: rgba(251, 191, 36, 0.14);
+  }
+
+  &.missing {
+    border-color: rgba(248, 113, 113, 0.62);
+    background: rgba(248, 113, 113, 0.16);
+  }
+}
+
+.opsActionBtns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.opsList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.opsTimeline {
+  display: grid;
+  gap: 8px;
+}
+
+.opsTimelineRow {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.opsStateDot {
+  margin-top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+
+  &.ok {
+    background: rgba(45, 212, 191, 0.9);
+  }
+
+  &.info {
+    background: rgba(122, 162, 255, 0.95);
+  }
+
+  &.warn {
+    background: rgba(251, 191, 36, 0.95);
+  }
+
+  &.critical {
+    background: rgba(248, 113, 113, 0.95);
+  }
+}
+
+.opsTimelineBody {
+  min-width: 0;
+}
+
+.opsTimelineTitle {
+  font-size: 13px;
+}
+
+.opsTimelineMeta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.opsCodeBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.opsCodeBlock code {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  font-size: 12px;
+  overflow: auto;
+}
+
+.opsIntentForm {
+  display: grid;
+  gap: 6px;
+
+  label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+}
+
+.opsIntentTextarea {
+  width: 100%;
+  min-height: 72px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  padding: 10px;
+  font: inherit;
+}
+
+.opsIntentControls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+
+  label {
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  select,
+  input {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text);
+    padding: 8px 10px;
+    font: inherit;
+  }
+}
+
+.opsIntentCheck {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.opsIntentPlanGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.opsIntentPhase {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.opsIntentExecution {
+  display: grid;
+  gap: 10px;
+}
+
+.opsIntentContractBlocks {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opsIntentContractBlock {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 980px) {
+  .opsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .opsKpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .opsTop {
+    flex-direction: column;
+  }
+
+  .opsIntentPlanGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .opsIntentContractBlocks {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .opsKpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .opsTable {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .opsTable th,
+  .opsTable td {
+    font-size: 11px;
+    padding: 6px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .opsIntentControls {
+    grid-template-columns: 1fr;
+  }
+}
+
+.flowShell {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.flowTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.flowTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.flowSub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.flowActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.flowMeta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.flowPillError {
+  border-color: rgba(248, 113, 113, 0.62);
+  color: rgba(255, 214, 214, 0.95);
+}
+
+.flowCanvas {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(122, 162, 255, 0.08), rgba(45, 212, 191, 0.04));
+  background-size: 18px 18px, auto;
+  min-height: 560px;
+  overflow: auto;
+}
+
+.flowSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.flowEdge {
+  fill: none;
+  stroke: rgba(122, 162, 255, 0.85);
+  stroke-width: 2.2;
+}
+
+.flowNode {
+  position: absolute;
+  width: 190px;
+  min-height: 104px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(11, 15, 21, 0.92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+
+.flowNode.agent {
+  border-color: rgba(122, 162, 255, 0.62);
+}
+
+.flowNode.tool {
+  border-color: rgba(45, 212, 191, 0.62);
+}
+
+.flowNode.memory {
+  border-color: rgba(250, 204, 21, 0.62);
+}
+
+.flowNode.decision {
+  border-color: rgba(248, 113, 113, 0.62);
+}
+
+.flowNode.ok {
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.3) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.flowNode.warn {
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.26) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.flowNode.missing {
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.34) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.flowNode.active {
+  outline: 2px solid rgba(122, 162, 255, 0.7);
+  outline-offset: 1px;
+}
+
+.flowNodeHead {
+  padding: 10px 10px 6px 10px;
+  display: grid;
+  gap: 6px;
+  cursor: grab;
+  font-weight: 700;
+}
+
+.flowNodeHead:active {
+  cursor: grabbing;
+}
+
+.flowNodeKind {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.flowNodeFoot {
+  padding: 0 10px 10px 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.flowNodeDetail {
+  padding: 0 10px 8px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  min-height: 30px;
+}
+
+.flowOutDot,
+.flowInDot {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.flowOutDot.active {
+  border-color: rgba(122, 162, 255, 0.75);
+  background: rgba(122, 162, 255, 0.22);
+}
+
+.flowInDot {
+  position: absolute;
+  left: -11px;
+  top: calc(50% - 11px);
+}
+
+.flowLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.flowInspector,
+.flowExecution {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.16);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.flowInspectorTitle {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.flowInspector label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.flowInspector input,
+.flowInspector select,
+.flowInspector textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.flowExecutionList {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.flowExecutionItem {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.flowExecutionItem.ok {
+  border-color: rgba(45, 212, 191, 0.52);
+}
+
+.flowExecutionItem.fail {
+  border-color: rgba(248, 113, 113, 0.56);
+}
+
+.personaSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.personaSettingsTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.personaActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.personaGrid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 12px;
+}
+
+.personaEditor {
+  width: 100%;
+  min-height: 420px;
+  background: #0d1117;
+  color: #e8eaee;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 12px;
+  font: 12px/1.45 "Menlo", "Consolas", monospace;
+}
+
+@media (max-width: 980px) {
+  .flowTop {
+    flex-direction: column;
+  }
+
+  .personaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .personaEditor {
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 640px) {
+  .flowCanvas {
+    min-height: 480px;
+  }
+
+  .flowNode {
+    width: 170px;
   }
 }

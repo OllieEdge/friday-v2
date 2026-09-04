@@ -76,7 +76,9 @@ function verifyToolRequest({ req, bodyText }) {
 }
 
 async function execCommand({ command, args, cwd, timeoutMs, confirm }) {
-  if (!normalizeBoolean(confirm)) return { ok: false, error: "confirm_required" };
+  const requireConfirmRaw = envString("FRIDAY_TOOL_REQUIRE_CONFIRM", "");
+  const requireConfirm = requireConfirmRaw ? normalizeBoolean(requireConfirmRaw) : true;
+  if (requireConfirm && !normalizeBoolean(confirm)) return { ok: false, error: "confirm_required" };
   if (!normalizeBoolean(envString("FRIDAY_TOOL_ALLOW_ALL", ""))) return { ok: false, error: "tool_exec_disabled" };
 
   const cmd = normalizeString(command);

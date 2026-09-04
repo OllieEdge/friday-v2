@@ -16,6 +16,8 @@ function registerRunbooks(router, deps) {
     runAssistant,
     getActiveCodexProfile,
     getCodexRunnerPrefs,
+    getAssistantRunnerPrefs,
+    googleAccounts,
     listRunbooks,
     runRunbookOnce,
     updateRunbookFile,
@@ -66,31 +68,34 @@ function registerRunbooks(router, deps) {
     const rb = findRunbook(params.runbookId);
     if (!rb) return sendJson(res, 404, { ok: false, error: "not_found" });
     const started = [];
+    const results = [];
     for (const accountKey of rb.meta.accounts || []) {
       const task = tasks.create({ kind: "runbook_run_now", status: "running" });
       started.push({ accountKey, taskId: task.id });
-      setImmediate(async () => {
-        try {
-          await runRunbookOnce({
-            runbook: rb,
-            accountKey,
-            chats,
-            triage,
-            runbooksDb,
-            loadContext,
-            runAssistant,
-            tasks,
-            task,
-            codexProfiles,
-            getActiveCodexProfile,
-            getCodexRunnerPrefs,
-          });
-        } catch (e) {
-          tasks.finish(task, false, null);
-        }
-      });
+      try {
+        const result = await runRunbookOnce({
+          runbook: rb,
+          accountKey,
+          chats,
+          triage,
+          runbooksDb,
+          loadContext,
+          runAssistant,
+          tasks,
+          task,
+          codexProfiles,
+          getActiveCodexProfile,
+          getCodexRunnerPrefs,
+          getAssistantRunnerPrefs,
+          googleAccounts,
+        });
+        results.push(result);
+      } catch (e) {
+        tasks.finish(task, false, null);
+        results.push({ ok: false, error: String(e?.message || e), taskId: task.id, runId: null });
+      }
     }
-    return sendJson(res, 202, { ok: true, started });
+    return sendJson(res, 200, { ok: true, started, results });
   });
 
   router.add("GET", "/api/runbooks/:runbookId/runs", (_req, res, url, params) => {

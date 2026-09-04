@@ -22,6 +22,11 @@ Deploy the current Friday v2 repo to the canonical v2 environment:
 4) Restart the LaunchAgent.
 5) Verify `GET https://friday2.edgflix.com/api/health` returns `{ "ok": true }`.
 
+## Definition of done (Codex sessions)
+
+- Treat implementation as incomplete until the current working state is built and deployed on the Mac mini.
+- Always include deployment verification (`local /api/health` and public `https://friday2.edgflix.com/api/health`) before reporting completion.
+
 If nginx config changed, reload nginx (as the automation sudo user).
 
 ## Runner config (quick)

@@ -2,9 +2,10 @@ const { readJson } = require("../http/body");
 const { sendJson } = require("../http/respond");
 const { envString } = require("../config/env");
 
-const RUNNERS = new Set(["noop", "auto", "codex", "openai", "metered", "api", "vertex"]);
+const RUNNERS = new Set(["noop", "auto", "codex", "openai", "metered", "api", "vertex", "hybrid"]);
 const VERTEX_AUTH_MODES = new Set(["aws_secret", "google_oauth"]);
 const GOOGLE_ACCOUNT_KEYS = new Set(["work", "personal"]);
+const HYBRID_FALLBACK_RUNNERS = new Set(["vertex", "openai", "codex"]);
 
 function safeRunner(value) {
   const v = String(value || "").trim().toLowerCase();
@@ -29,6 +30,17 @@ function safeGoogleAccountKey(value) {
   return GOOGLE_ACCOUNT_KEYS.has(v) ? v : "work";
 }
 
+function safeHybridFallbackRunner(value) {
+  const v = String(value || "").trim().toLowerCase();
+  return HYBRID_FALLBACK_RUNNERS.has(v) ? v : "vertex";
+}
+
+function safeInt(value, fallback, min = 1, max = 1_000_000) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
 function isTruthy(value) {
   const v = String(value || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
@@ -49,6 +61,14 @@ function readAssistantRunnerPrefs({ settings }) {
       location: safeText(vertexLocation),
       authMode: safeVertexAuthMode(settings.get("vertex_auth_mode") || envString("VERTEX_AUTH_MODE", "")),
       googleAccountKey: safeGoogleAccountKey(settings.get("vertex_google_account_key") || envString("VERTEX_GOOGLE_ACCOUNT_KEY", "work")),
+    },
+    hybrid: {
+      model: safeText(settings.get("hybrid_model") || envString("LOCAL_LLM_MODEL", "qwen2.5:7b-instruct")),
+      baseUrl: safeText(settings.get("hybrid_base_url") || envString("LOCAL_LLM_BASE_URL", "http://127.0.0.1:11434"), 400),
+      apiKey: safeText(settings.get("hybrid_api_key") || envString("LOCAL_LLM_API_KEY", "ollama"), 300),
+      fallbackRunner: safeHybridFallbackRunner(settings.get("hybrid_fallback_runner") || envString("HYBRID_FALLBACK_RUNNER", "vertex")),
+      localOnlyMaxChars: safeInt(settings.get("hybrid_local_only_max_chars"), 1200, 200, 10000),
+      maxContextChars: safeInt(settings.get("hybrid_max_context_chars"), 24000, 4000, 120000),
     },
   };
 }
@@ -80,6 +100,12 @@ function registerRunnerSettings(router, { settings }) {
     const vertexModel = safeText(body?.vertex?.model);
     const vertexAuthMode = safeVertexAuthMode(body?.vertex?.authMode);
     const vertexGoogleAccountKey = safeGoogleAccountKey(body?.vertex?.googleAccountKey);
+    const hybridModel = safeText(body?.hybrid?.model || envString("LOCAL_LLM_MODEL", "qwen2.5:7b-instruct"));
+    const hybridBaseUrl = safeText(body?.hybrid?.baseUrl || envString("LOCAL_LLM_BASE_URL", "http://127.0.0.1:11434"), 400);
+    const hybridApiKey = safeText(body?.hybrid?.apiKey || envString("LOCAL_LLM_API_KEY", "ollama"), 300);
+    const hybridFallbackRunner = safeHybridFallbackRunner(body?.hybrid?.fallbackRunner || envString("HYBRID_FALLBACK_RUNNER", "vertex"));
+    const hybridLocalOnlyMaxChars = safeInt(body?.hybrid?.localOnlyMaxChars, 1200, 200, 10000);
+    const hybridMaxContextChars = safeInt(body?.hybrid?.maxContextChars, 24000, 4000, 120000);
 
     settings.set("assistant_runner", runner);
     settings.set("openai_model", openaiModel);
@@ -87,6 +113,12 @@ function registerRunnerSettings(router, { settings }) {
     settings.set("vertex_model", vertexModel);
     settings.set("vertex_auth_mode", vertexAuthMode);
     settings.set("vertex_google_account_key", vertexGoogleAccountKey);
+    settings.set("hybrid_model", hybridModel);
+    settings.set("hybrid_base_url", hybridBaseUrl);
+    settings.set("hybrid_api_key", hybridApiKey);
+    settings.set("hybrid_fallback_runner", hybridFallbackRunner);
+    settings.set("hybrid_local_only_max_chars", String(hybridLocalOnlyMaxChars));
+    settings.set("hybrid_max_context_chars", String(hybridMaxContextChars));
     // Project/location are environment-scoped for this deployment; keep DB keys empty to avoid drift.
     settings.set("vertex_project_id", "");
     settings.set("vertex_location", "");

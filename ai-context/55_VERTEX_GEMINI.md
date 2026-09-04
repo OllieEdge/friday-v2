@@ -13,7 +13,7 @@ Friday v2 can run Gemini via **Google Vertex AI** (server-side) when the assista
 
 - `VERTEX_PROJECT_ID=tmg-product-innovation-prod` (default)
 - `VERTEX_LOCATION=europe-west2` (default)
-- optional: `VERTEX_MODEL=gemini-2.0-flash`
+- recommended: `VERTEX_MODEL=gemini-2.5-flash` (works in `europe-west2`)
 
 2) Choose ONE auth method:
 
@@ -77,3 +77,6 @@ When tool execution is enabled, context caching is disabled for Vertex to avoid 
 - Uses Vertex `:generateContent` and runs inside `friday-server`/`friday-worker`.
 - Token usage is best-effort and may not match billing exactly.
 - Model dropdown is populated by probing known Gemini model IDs via `generateContent`; it requires Vertex auth to be configured.
+- Practical model/region note:
+  - `europe-west2` currently allows `gemini-2.5-flash`
+  - `gemini-2.5-pro` is available in `europe-west1` and `us-central1`

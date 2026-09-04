@@ -91,6 +91,12 @@ export function AccountsPanel({
   const [vertexModels, setVertexModels] = useState<string[]>([]);
   const [vertexModelsLoading, setVertexModelsLoading] = useState(false);
   const [vertexModelsError, setVertexModelsError] = useState<string | null>(null);
+  const [hybridModel, setHybridModel] = useState("qwen2.5:7b-instruct");
+  const [hybridBaseUrl, setHybridBaseUrl] = useState("http://127.0.0.1:11434");
+  const [hybridApiKey, setHybridApiKey] = useState("ollama");
+  const [hybridFallbackRunner, setHybridFallbackRunner] = useState<"vertex" | "openai" | "codex">("vertex");
+  const [hybridLocalOnlyMaxChars, setHybridLocalOnlyMaxChars] = useState<number>(1200);
+  const [hybridMaxContextChars, setHybridMaxContextChars] = useState<number>(24000);
 
   const activeId = accounts?.activeProfileId ?? null;
   const [sandboxMode, setSandboxMode] = useState<UpdatePrefsResponse["runner"]["sandboxMode"]>("read-only");
@@ -121,6 +127,12 @@ export function AccountsPanel({
     setVertexModel(res.prefs.vertex.model || "");
     setVertexAuthMode((res.prefs.vertex.authMode as any) || "aws_secret");
     setVertexGoogleAccountKey((res.prefs.vertex.googleAccountKey as any) || "work");
+    setHybridModel(res.prefs.hybrid?.model || "qwen2.5:7b-instruct");
+    setHybridBaseUrl(res.prefs.hybrid?.baseUrl || "http://127.0.0.1:11434");
+    setHybridApiKey(res.prefs.hybrid?.apiKey || "ollama");
+    setHybridFallbackRunner((res.prefs.hybrid?.fallbackRunner as any) || "vertex");
+    setHybridLocalOnlyMaxChars(Number(res.prefs.hybrid?.localOnlyMaxChars) || 1200);
+    setHybridMaxContextChars(Number(res.prefs.hybrid?.maxContextChars) || 24000);
   }
 
   async function refreshVertexModels() {
@@ -212,6 +224,14 @@ export function AccountsPanel({
         runner: assistantRunner,
         openai: { model: openaiModel, baseUrl: openaiBaseUrl },
         vertex: { model: vertexModel, authMode: vertexAuthMode, googleAccountKey: vertexGoogleAccountKey },
+        hybrid: {
+          model: hybridModel,
+          baseUrl: hybridBaseUrl,
+          apiKey: hybridApiKey,
+          fallbackRunner: hybridFallbackRunner,
+          localOnlyMaxChars: Number(hybridLocalOnlyMaxChars) || 1200,
+          maxContextChars: Number(hybridMaxContextChars) || 24000,
+        },
       }),
     });
     setRunnerSettings(res);
@@ -221,6 +241,12 @@ export function AccountsPanel({
     setVertexModel(res.prefs.vertex.model || "");
     setVertexAuthMode((res.prefs.vertex.authMode as any) || "aws_secret");
     setVertexGoogleAccountKey((res.prefs.vertex.googleAccountKey as any) || "work");
+    setHybridModel(res.prefs.hybrid?.model || "qwen2.5:7b-instruct");
+    setHybridBaseUrl(res.prefs.hybrid?.baseUrl || "http://127.0.0.1:11434");
+    setHybridApiKey(res.prefs.hybrid?.apiKey || "ollama");
+    setHybridFallbackRunner((res.prefs.hybrid?.fallbackRunner as any) || "vertex");
+    setHybridLocalOnlyMaxChars(Number(res.prefs.hybrid?.localOnlyMaxChars) || 1200);
+    setHybridMaxContextChars(Number(res.prefs.hybrid?.maxContextChars) || 24000);
   }
 
   async function connectGoogle(accountKey: "work" | "personal", purpose: "default" | "vertex" = "default") {
@@ -371,6 +397,7 @@ export function AccountsPanel({
             <select className="input" value={assistantRunner} onChange={(e) => setAssistantRunner(e.target.value as any)}>
               <option value="codex">Codex (seat)</option>
               <option value="vertex">Google (Gemini via Vertex)</option>
+              <option value="hybrid">Hybrid (Local first)</option>
               <option value="openai">OpenAI (metered)</option>
               <option value="auto">Auto (Codex → OpenAI)</option>
               <option value="noop">Noop (disabled)</option>
@@ -504,6 +531,71 @@ export function AccountsPanel({
               ) : (
                 <div className="muted">Auth stays in `.env` (recommended: `VERTEX_AWS_SECRET_ID` + `VERTEX_AWS_PROFILE=telegraph`).</div>
               )}
+            </div>
+
+            <div style={{ display: "grid", gap: 6 }}>
+              <div style={{ fontWeight: 700 }}>Local LLM (Ollama)</div>
+              <div className="row wrap">
+                <label style={{ flex: 1, minWidth: 220, display: "grid", gap: 6 }}>
+                  <div className="muted">Model</div>
+                  <input
+                    className="input"
+                    value={hybridModel}
+                    onChange={(e) => setHybridModel(e.target.value)}
+                    placeholder="qwen2.5:7b-instruct"
+                  />
+                </label>
+                <label style={{ flex: 1, minWidth: 240, display: "grid", gap: 6 }}>
+                  <div className="muted">Base URL</div>
+                  <input
+                    className="input"
+                    value={hybridBaseUrl}
+                    onChange={(e) => setHybridBaseUrl(e.target.value)}
+                    placeholder="http://127.0.0.1:11434"
+                  />
+                </label>
+              </div>
+              <div className="row wrap">
+                <label style={{ flex: 1, minWidth: 220, display: "grid", gap: 6 }}>
+                  <div className="muted">API key</div>
+                  <input className="input" value={hybridApiKey} onChange={(e) => setHybridApiKey(e.target.value)} placeholder="ollama" />
+                </label>
+                <label style={{ flex: 1, minWidth: 220, display: "grid", gap: 6 }}>
+                  <div className="muted">Fallback runner</div>
+                  <select className="input" value={hybridFallbackRunner} onChange={(e) => setHybridFallbackRunner(e.target.value as any)}>
+                    <option value="vertex">Vertex</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                </label>
+              </div>
+              <div className="row wrap">
+                <label style={{ flex: 1, minWidth: 220, display: "grid", gap: 6 }}>
+                  <div className="muted">Local-only max prompt chars</div>
+                  <input
+                    className="input"
+                    type="number"
+                    min={200}
+                    max={10000}
+                    value={hybridLocalOnlyMaxChars}
+                    onChange={(e) => setHybridLocalOnlyMaxChars(Number(e.target.value || 1200))}
+                  />
+                </label>
+                <label style={{ flex: 1, minWidth: 220, display: "grid", gap: 6 }}>
+                  <div className="muted">Context chars sent to local model</div>
+                  <input
+                    className="input"
+                    type="number"
+                    min={4000}
+                    max={120000}
+                    value={hybridMaxContextChars}
+                    onChange={(e) => setHybridMaxContextChars(Number(e.target.value || 24000))}
+                  />
+                </label>
+              </div>
+              <div className="muted">
+                Pick runner <code>Hybrid</code> to route short/general requests to Ollama and auto-fallback to the selected cloud runner.
+              </div>
             </div>
           </div>
         </details>

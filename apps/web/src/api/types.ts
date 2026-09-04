@@ -85,7 +85,7 @@ export type ContextMetrics = {
 };
 
 export type GoogleAccount = {
-  accountKey: "work" | "personal";
+  accountKey: string;
   connected: boolean;
   email?: string;
   scopes?: string;
@@ -116,7 +116,7 @@ export type MicrosoftAccountsResponse = {
   accounts: MicrosoftAccount[];
 };
 
-export type AssistantRunner = "noop" | "auto" | "codex" | "openai" | "metered" | "api" | "vertex";
+export type AssistantRunner = "noop" | "auto" | "codex" | "openai" | "metered" | "api" | "vertex" | "hybrid";
 
 export type RunnerPrefs = {
   runner: AssistantRunner;
@@ -129,7 +129,15 @@ export type RunnerPrefs = {
     projectId: string;
     location: string;
     authMode?: "aws_secret" | "google_oauth";
-    googleAccountKey?: "work" | "personal";
+    googleAccountKey?: string;
+  };
+  hybrid: {
+    model: string;
+    baseUrl: string;
+    apiKey: string;
+    fallbackRunner: "vertex" | "openai" | "codex";
+    localOnlyMaxChars: number;
+    maxContextChars: number;
   };
 };
 
@@ -320,7 +328,7 @@ export type RunbookSummary = {
   enabled: boolean;
   everyMinutes: number | null;
   timezone: string;
-  accounts: Array<"work" | "personal">;
+  accounts: string[];
   cursorStrategy: string;
   path: string;
   lastRunAt: string | null;
@@ -361,6 +369,29 @@ export type PasskeysResponse = {
   ok: true;
   user: AuthUser;
   passkeys: Passkey[];
+};
+
+export type PersonaRecord = {
+  id: string;
+  label: string;
+  description: string;
+  traits: string[];
+  responsibilities: string[];
+  tone: { voice: string; formality: string; verbosity: string };
+  boundaries: string[];
+  toolPolicy: { mode: string; allow: string[]; deny: string[] };
+  channels: string[];
+  promptAddendum: string;
+  source?: any;
+  updatedAt?: string;
+};
+
+export type PersonasResponse = {
+  ok: true;
+  updatedAt: string;
+  template: any;
+  personas: PersonaRecord[];
+  file: string;
 };
 
 
@@ -430,4 +461,453 @@ export type PmSizingResponse = {
   ok: true;
   project: PmProject;
   sizing: { ok: true; sizeLabel: string; timeEstimate: string; risks: string[] };
+};
+
+export type OpsHealth = {
+  level: "ok" | "warn" | "critical";
+  blockers: number;
+  warnings: number;
+  summary: string;
+};
+
+export type OpsChannel = {
+  channel: string;
+  accountId: string;
+  name: string;
+  enabled: boolean;
+  configured: boolean;
+  running: boolean;
+  connected: boolean;
+  state: "ok" | "degraded" | "missing";
+  lastError: string | null;
+  lastInboundAt: string | null;
+  lastOutboundAt: string | null;
+};
+
+export type OpsCapability = {
+  id: string;
+  area: string;
+  configured: boolean;
+  status: "ok" | "missing" | "degraded";
+  access: string;
+  testCommand: string;
+  notes?: string;
+};
+
+export type OpsActionStatus = "pending" | "confirmed" | "cancelled" | "completed";
+
+export type OpsAction = {
+  id: string;
+  createdAt: string;
+  status: OpsActionStatus;
+  channel: string;
+  contact: string;
+  intent: string;
+  summary: string;
+  sourceText: string;
+  dueAt: string | null;
+  meta: any;
+  confirmedAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+};
+
+export type OpsRunbook = {
+  runbookId: string;
+  title: string;
+  enabled: boolean;
+  everyMinutes: number | null;
+  timezone: string;
+  accounts: string[];
+  path: string | null;
+  lastStatus: string;
+  lastRunAt: string | null;
+  lastError: string | null;
+  nextRunAt: string | null;
+  stale: boolean;
+};
+
+export type OpsFinding = {
+  kind: "quick_read" | "next_action";
+  priority: number;
+  confidence_pct: number;
+  source_key: string;
+  title: string;
+  summary_md: string;
+  source: any;
+};
+
+export type OpsTimelineEvent = {
+  id: string;
+  ts: string | null;
+  source: "actions" | "ops" | "runbook" | "triage";
+  kind: string;
+  severity: "ok" | "info" | "warn" | "error";
+  title: string;
+  detail: string | null;
+};
+
+export type OpsOverview = {
+  generatedAt: string;
+  health: OpsHealth;
+  queue: {
+    actions: {
+      total: number;
+      pending: number;
+      confirmed: number;
+      cancelled: number;
+      completed: number;
+    };
+    triage: {
+      open: number;
+      completed: number;
+      dismissed: number;
+      nextActionOpen: number;
+      quickReadOpen: number;
+      urgentOpen: number;
+    };
+    runbooks: {
+      total: number;
+      ok: number;
+      error: number;
+      running: number;
+      stale: number;
+    };
+  };
+  channels: OpsChannel[];
+  capabilities: {
+    summary: {
+      total: number;
+      configured: number;
+      healthy: number;
+      missing: number;
+      degraded: number;
+    };
+    items: OpsCapability[];
+    checks: any;
+    missing: OpsCapability[];
+    degraded: OpsCapability[];
+  };
+  actions: OpsAction[];
+  triage: TriageItem[];
+  runbooks: OpsRunbook[];
+  byAccount: {
+    summary: {
+      accounts: number;
+      triageOpen: number;
+      actionsPending: number;
+      actionsConfirmed: number;
+      draftPending: number;
+      draftConfirmed: number;
+    };
+    rows: Array<{
+      accountKey: string;
+      triageOpen: number;
+      triageUrgent: number;
+      triageNextAction: number;
+      triageQuickRead: number;
+      actionsPending: number;
+      actionsConfirmed: number;
+      actionsCompleted: number;
+      actionsCancelled: number;
+      draftPending: number;
+      draftConfirmed: number;
+      draftCompleted: number;
+      draftCancelled: number;
+    }>;
+  };
+  findings: {
+    controlTower: { ok?: boolean; summary?: any; findings?: OpsFinding[] };
+    workstream: { ok?: boolean; summary?: any; findings?: OpsFinding[]; repoCount?: number; github?: any };
+  };
+  timeline: OpsTimelineEvent[];
+  digestMarkdown: string;
+  files: {
+    digestJson: string;
+    digestMarkdown: string;
+    auditJson: string;
+    controlTowerJson: string;
+    workstreamJson: string;
+    actionsJson: string;
+    actionsEvents: string;
+    opsEvents: string;
+    dbPath: string;
+  };
+};
+
+export type OpsOverviewResponse = {
+  ok: true;
+  overview: OpsOverview;
+};
+
+export type OpsRefreshResponse = {
+  ok: true;
+  refresh: {
+    digest: { ok: boolean; code: number | null; stderr: string | null };
+    audit: { ok: boolean; code: number | null; stderr: string | null };
+    controlTower: { ok: boolean; code: number | null; stderr: string | null; persisted: boolean };
+    workstream: { ok: boolean; code: number | null; stderr: string | null; persisted: boolean };
+  };
+  overview: OpsOverview;
+};
+
+export type OpsActionsResponse = {
+  ok: true;
+  status: "all" | OpsActionStatus;
+  counts: OpsOverview["queue"]["actions"];
+  actions: OpsAction[];
+  events: Array<{ ts: string; type: string; payload: any }>;
+};
+
+export type OpsActionUpdateResponse = {
+  ok: true;
+  action: OpsAction | null;
+  triageItem?: TriageItem | null;
+  sent?: {
+    actionId: string;
+    accountKey: string;
+    to: string;
+    subject: string;
+    gmailMessageId: string | null;
+    sentAt?: string;
+  } | null;
+  overview: OpsOverview;
+};
+
+export type TriageDraftQueueResponse = {
+  ok: true;
+  existed: boolean;
+  action: OpsAction | null;
+  sent: {
+    actionId: string;
+    accountKey: string;
+    to: string;
+    subject: string;
+    gmailMessageId: string | null;
+    sentAt?: string;
+  } | null;
+  item: TriageItem;
+  overview: OpsOverview;
+};
+
+export type OpsTimelineResponse = {
+  ok: true;
+  generatedAt: string;
+  timeline: OpsTimelineEvent[];
+};
+
+export type OpsFlowStepKind = "ai_cmd" | "shell_cmd" | "note";
+
+export type OpsFlowPlanStep = {
+  id: string;
+  kind: OpsFlowStepKind;
+  requiredInputs: string[];
+  missingInputs: string[];
+  requiresFixIntent: boolean;
+  condition: string | null;
+  blockedByFixIntent: boolean;
+  runnable: boolean;
+  command?: string;
+  argsTemplate?: string;
+  args?: string;
+  run?: string;
+  template?: string;
+  note?: string;
+};
+
+export type OpsFlowPlanPhase = {
+  ready: boolean;
+  missingInputs: string[];
+  steps: OpsFlowPlanStep[];
+  enabled?: boolean;
+  reason?: string | null;
+};
+
+export type OpsFlowIntentMatch = {
+  id: string;
+  title: string;
+  priority: number;
+  score: number;
+  matchedTriggers: Array<{ matched: boolean; score: number; trigger: string; mode: "exact" | "phrase" | "token_set" | "none" }>;
+};
+
+export type OpsFlowIntentResolution = {
+  ok: true;
+  text: string;
+  normalizedText: string;
+  fixIntent: { value: boolean; source: "explicit" | "pattern"; pattern: string | null };
+  match: OpsFlowIntentMatch | null;
+  candidates: OpsFlowIntentMatch[];
+  plan: {
+    diagnose: OpsFlowPlanPhase;
+    repair: OpsFlowPlanPhase;
+    verify: OpsFlowPlanPhase;
+  } | null;
+  missingInputs: string[];
+};
+
+export type OpsFlowRegistryValidation = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  stats: {
+    flowCount: number;
+    triggerCount: number;
+    aiStepCount: number;
+    shellStepCount: number;
+    noteStepCount: number;
+    aiCommandCount: number;
+  };
+};
+
+export type OpsFlowRegistryResponse = {
+  ok: true;
+  registry: {
+    schemaVersion: number;
+    responseContract: string[];
+    fixIntentPatterns: string[];
+    flows: Array<{ id: string; title: string; priority: number; triggers: string[] }>;
+  };
+  validation: OpsFlowRegistryValidation;
+  sources: { flowRegistryPath: string; aiRegistryPath: string };
+};
+
+export type OpsResolveIntentResponse = {
+  ok: true;
+  resolution: OpsFlowIntentResolution;
+  validation: OpsFlowRegistryValidation;
+};
+
+export type OpsFlowExecutionStep = {
+  id: string;
+  phase: "diagnose" | "repair" | "verify";
+  kind: OpsFlowStepKind;
+  status: "ok" | "failed" | "skipped" | "noted";
+  ok: boolean;
+  reason: string | null;
+  command: string;
+  note: string;
+  cwd?: string;
+  code: number | null;
+  durationMs: number;
+  stdout: string;
+  stderr: string;
+  facts: Record<string, any>;
+};
+
+export type OpsFlowExecutionSummary = {
+  total: number;
+  ok: number;
+  failed: number;
+  skipped: number;
+  noted: number;
+  durationMs: number;
+};
+
+export type OpsFlowExecutionResult = {
+  ok: boolean;
+  error?: string;
+  phases: {
+    diagnose: OpsFlowExecutionStep[];
+    repair: OpsFlowExecutionStep[];
+    verify: OpsFlowExecutionStep[];
+  };
+  summaries: {
+    diagnose: OpsFlowExecutionSummary;
+    repair: OpsFlowExecutionSummary;
+    verify: OpsFlowExecutionSummary;
+  };
+  runRepairRequested: boolean;
+  runVerify: boolean;
+  repairAttempted: boolean;
+  facts: Record<string, any>;
+};
+
+export type OpsFlowContractResponse = {
+  diagnosis: string;
+  evidence: string[];
+  actions: string[];
+  status: "healthy" | "degraded" | "still failing";
+  nextAction: string;
+  contractTemplate: string[];
+};
+
+export type OpsResolveIntentExecuteResponse = {
+  ok: true;
+  resolution: OpsFlowIntentResolution;
+  execution: OpsFlowExecutionResult;
+  response: OpsFlowContractResponse;
+  validation: OpsFlowRegistryValidation;
+};
+
+export type ModelLane = "triage" | "planning" | "coding" | "highRisk" | "ops";
+
+export type ModelCapabilitySet = {
+  planning: boolean;
+  coding: boolean;
+  toolCalling: boolean;
+  longContext: boolean;
+  maxContextTokens: number;
+};
+
+export type ModelCertificationCheck = {
+  id: string;
+  ok: boolean;
+  detail: string;
+};
+
+export type ModelCertification = {
+  status: "unknown" | "ok" | "failed";
+  lastRunAt: string | null;
+  lastOk: boolean;
+  checks: ModelCertificationCheck[];
+};
+
+export type ModelRegistryModel = {
+  id: string;
+  label: string;
+  provider: string;
+  model: string;
+  enabled: boolean;
+  capabilities: ModelCapabilitySet;
+  costTier: "low" | "medium" | "high";
+  latencyTier: "low" | "medium" | "high";
+  notes: string;
+  certification: ModelCertification;
+  updatedAt: string;
+};
+
+export type ModelRegistryRouting = {
+  laneDefaults: Partial<Record<ModelLane, string>>;
+  personaOverrides: Record<string, Partial<Record<ModelLane, string>>>;
+};
+
+export type ModelRegistryStore = {
+  version: number;
+  updatedAt: string;
+  template?: {
+    title?: string;
+    description?: string;
+    laneKeys?: ModelLane[];
+  };
+  models: ModelRegistryModel[];
+  routing: ModelRegistryRouting;
+};
+
+export type ModelRegistryResponse = {
+  ok: true;
+  store: ModelRegistryStore;
+  file: string;
+};
+
+export type ModelRegistryCertifyResponse = {
+  ok: true;
+  model: ModelRegistryModel;
+  certification: {
+    ok: boolean;
+    summary: string;
+    checks: ModelCertificationCheck[];
+  };
+  store: ModelRegistryStore;
+  file: string;
 };

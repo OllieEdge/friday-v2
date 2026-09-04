@@ -26,6 +26,19 @@ function hydrateMessagesWithRunEvents(chats, chat) {
 }
 
 function registerChats(router, { chats, runAssistant, loadContext, tasks, codexProfiles }) {
+  function normalizeLane(value) {
+    const v = String(value || "")
+      .trim()
+      .replace(/[-\s]+/g, "")
+      .toLowerCase();
+    if (v === "triage") return "triage";
+    if (v === "planning" || v === "plan") return "planning";
+    if (v === "coding" || v === "code") return "coding";
+    if (v === "highrisk" || v === "risk") return "highRisk";
+    if (v === "ops" || v === "operations") return "ops";
+    return "planning";
+  }
+
   router.add("GET", "/api/chats", (_req, res) => {
     const list = chats.listChats();
     return sendJson(res, 200, { ok: true, chats: list });
@@ -61,7 +74,7 @@ function registerChats(router, { chats, runAssistant, loadContext, tasks, codexP
 
     let assistantContent = "";
     try {
-      const result = await runAssistant({ context, chat });
+      const result = await runAssistant({ context, chat, routingHint: { lane: "planning" } });
       assistantContent = String(result?.content || "");
       const costUsd = result?.usage ? estimateCostUsd(result.usage) : null;
       recordProfileUsage({ codexProfiles, profileId: result?.profileId, usage: result?.usage, costUsd });
@@ -76,6 +89,7 @@ function registerChats(router, { chats, runAssistant, loadContext, tasks, codexP
   router.add("POST", "/api/chats/:chatId/messages/stream", async (req, res, _url, params) => {
     const body = await readJson(req);
     const content = String(body?.content ?? "");
+    const lane = normalizeLane(body?.lane);
     const userMsg = chats.appendMessage({ chatId: params.chatId, role: "user", content });
     if (!userMsg) return sendJson(res, 404, { ok: false, error: "not_found" });
 
@@ -83,7 +97,7 @@ function registerChats(router, { chats, runAssistant, loadContext, tasks, codexP
       return sendJson(res, 400, { ok: false, error: "tasks_unavailable" });
     }
 
-    const task = tasks.create({ kind: "chat_run", input: { chatId: params.chatId } });
+    const task = tasks.create({ kind: "chat_run", input: { chatId: params.chatId, lane } });
     const assistantMeta = { run: { taskId: task.id, status: "running", startedAt: new Date().toISOString() } };
     const assistantMsg = chats.appendMessage({ chatId: params.chatId, role: "assistant", content: "Thinking…", meta: assistantMeta });
     if (assistantMsg) {

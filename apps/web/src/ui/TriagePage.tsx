@@ -14,6 +14,7 @@ import type {
   PersonRecord,
   ResolveAliasesResponse,
   TriageItem,
+  TriageDraftQueueResponse,
   TriageItemsResponse,
   UpsertAliasResponse,
 } from "../api/types";
@@ -74,6 +75,54 @@ function applySort(items: TriageItem[], mode: SortMode) {
   return list;
 }
 
+type SuggestedDraft = {
+  sourceKey: string;
+  accountKey: string;
+  to: string;
+  subject: string;
+  body: string;
+  confidence: number | null;
+};
+
+type SuggestedDraftAction = {
+  id: string;
+  status: string;
+  updatedAt?: string | null;
+};
+
+function pickSuggestedDraft(item: TriageItem | null): SuggestedDraft | null {
+  const src = item?.source || null;
+  if (!src || typeof src !== "object") return null;
+  const raw = src.suggestedDraft;
+  if (!raw || typeof raw !== "object") return null;
+  const body = String(raw.body || "").trim();
+  if (!body) return null;
+  const confidenceRaw = raw.confidence;
+  const confidence = confidenceRaw == null ? null : Math.max(0, Math.min(100, Number(confidenceRaw) || 0));
+  return {
+    sourceKey: String(raw.sourceKey || "").trim(),
+    accountKey: String(raw.accountKey || "").trim() || "work",
+    to: String(raw.to || "").trim(),
+    subject: String(raw.subject || "").trim(),
+    body,
+    confidence,
+  };
+}
+
+function pickDraftAction(item: TriageItem | null): SuggestedDraftAction | null {
+  const src = item?.source || null;
+  if (!src || typeof src !== "object") return null;
+  const raw = src.draftAction;
+  if (!raw || typeof raw !== "object") return null;
+  const id = String(raw.id || "").trim();
+  if (!id) return null;
+  return {
+    id,
+    status: String(raw.status || "").trim() || "pending",
+    updatedAt: raw.updatedAt ? String(raw.updatedAt) : null,
+  };
+}
+
 export function TriagePage({
   onOpenChat,
 }: {
@@ -114,6 +163,15 @@ export function TriagePage({
   const [feedbackReason, setFeedbackReason] = useState("");
   const [feedbackOutcome, setFeedbackOutcome] = useState("");
   const [feedbackNotes, setFeedbackNotes] = useState("");
+  const [draftBusy, setDraftBusy] = useState<"" | "queue" | "approve" | "send">("");
+  const [draftError, setDraftError] = useState("");
+
+  function applyItemUpdate(item: TriageItem) {
+    setSelected((prev) => (prev && prev.id === item.id ? item : prev));
+    setRawQuickReads((prev) => prev.map((p) => (p.id === item.id ? item : p)));
+    setRawNextActions((prev) => prev.map((p) => (p.id === item.id ? item : p)));
+    setRawCompleted((prev) => prev.map((p) => (p.id === item.id ? item : p)));
+  }
 
   async function refreshLists() {
     const [qr, na, done] = await Promise.all([
@@ -124,6 +182,11 @@ export function TriagePage({
     setRawQuickReads(qr.items);
     setRawNextActions(na.items);
     setRawCompleted(done.items);
+    setSelected((prev) => {
+      if (!prev) return prev;
+      const next = [...qr.items, ...na.items, ...done.items].find((row) => row.id === prev.id);
+      return next || prev;
+    });
     void refreshAliases([...qr.items, ...na.items, ...done.items]);
     void refreshSpaces([...qr.items, ...na.items, ...done.items]);
   }
@@ -260,6 +323,31 @@ export function TriagePage({
     setRawCompleted((prev) => prev.map((p) => (p.id === item.id ? res.item : p)));
   }
 
+  async function runDraftQueue(item: TriageItem, mode: "queue" | "approve" | "send") {
+    setDraftBusy(mode);
+    setDraftError("");
+    try {
+      const body =
+        mode === "queue"
+          ? { confirm: false, sendNow: false }
+          : mode === "approve"
+            ? { confirm: true, sendNow: false }
+            : { confirm: true, sendNow: true };
+      const res = await api<TriageDraftQueueResponse>(`/api/ops/triage/items/${encodeURIComponent(item.id)}/draft/queue`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      applyItemUpdate(res.item);
+      if (selected?.id === res.item.id) {
+        await loadChat(res.item.chatId);
+      }
+    } catch (e: any) {
+      setDraftError(String(e?.message || e));
+    } finally {
+      setDraftBusy("");
+    }
+  }
+
   async function promoteChat(chatId: string) {
     await api<{ ok: true }>(`/api/chats/${chatId}/visibility`, { method: "POST", body: JSON.stringify({ hidden: false }) });
     onOpenChat(chatId);
@@ -361,6 +449,8 @@ export function TriagePage({
   const selectedMessage = selected?.source?.provider === "gchat" ? String(selected?.source?.message || "") : "";
   const selectedAlias = selectedSpace ? aliasMap[selectedSpace] : null;
   const selectedUserId = selectedSpace ? aliasUserIdBySpace[selectedSpace] || selectedAlias?.providerUserId || "" : "";
+  const selectedDraft = pickSuggestedDraft(selected);
+  const selectedDraftAction = pickDraftAction(selected);
 
   useEffect(() => {
     if (!selectedSpace) return;
@@ -714,8 +804,56 @@ export function TriagePage({
           {selected ? (
             <>
               {selectedHeader}
+              {selectedDraft ? (
+                <>
+                  <div className="settingsDivider" />
+                  <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>
+                    <Circle size={14} /> Suggested reply draft
+                  </div>
+                  <div className="muted">Queue, approve, and send from triage. Nothing sends until approved.</div>
+                  <div className="triageDraftBox">
+                    <div className="triageDraftMeta">
+                      <span className="pill">account: {selectedDraft.accountKey}</span>
+                      {selectedDraft.to ? <span className="pill">to: {selectedDraft.to}</span> : <span className="pill">to: (missing)</span>}
+                      <span className="pill">subject: {selectedDraft.subject || "(missing)"}</span>
+                      {selectedDraft.confidence != null ? <span className="pill">{Math.round(selectedDraft.confidence)}%</span> : null}
+                      {selectedDraftAction ? (
+                        <span className={`pill${selectedDraftAction.status === "confirmed" ? " pillActive" : ""}`}>
+                          {selectedDraftAction.status}
+                        </span>
+                      ) : null}
+                    </div>
+                    <pre className="triageDraftBody">{selectedDraft.body}</pre>
+                  </div>
+                  <div className="row wrap">
+                    <button
+                      className="btn"
+                      onClick={() => void runDraftQueue(selected, "queue")}
+                      disabled={Boolean(draftBusy) || Boolean(selectedDraftAction?.id)}
+                    >
+                      {draftBusy === "queue" ? "Queueing..." : selectedDraftAction?.id ? "Queued" : "Queue draft"}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      onClick={() => void runDraftQueue(selected, "approve")}
+                      disabled={Boolean(draftBusy) || selectedDraftAction?.status === "confirmed" || selectedDraftAction?.status === "completed"}
+                    >
+                      {draftBusy === "approve" ? "Approving..." : "Approve"}
+                    </button>
+                    <button className="btn primary" onClick={() => void runDraftQueue(selected, "send")} disabled={Boolean(draftBusy)}>
+                      {draftBusy === "send" ? "Sending..." : "Send approved draft"}
+                    </button>
+                  </div>
+                  {draftError ? <div className="muted">Draft error: {draftError}</div> : null}
+                </>
+              ) : (
+                <>
+                  {draftError ? <div className="muted">Draft error: {draftError}</div> : null}
+                </>
+              )}
               {selectedSpace ? (
                 <>
+                  <div className="settingsDivider" />
                   <div style={{ fontWeight: 800, display: "flex", gap: 8, alignItems: "center" }}>
                     <Circle size={14} /> Chat thread (last 3 months)
                   </div>

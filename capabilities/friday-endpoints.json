@@ -1,0 +1,794 @@
+{
+  "schemaVersion": 1,
+  "source": "server/src/routes/*.js",
+  "totalEndpoints": 115,
+  "routeFileCount": 22,
+  "authSummary": [
+    {
+      "auth": "public",
+      "count": 115
+    }
+  ],
+  "routeSummary": [
+    {
+      "routeFile": "server/src/routes/pm-projects.js",
+      "count": 15
+    },
+    {
+      "routeFile": "server/src/routes/ops.js",
+      "count": 13
+    },
+    {
+      "routeFile": "server/src/routes/people.js",
+      "count": 11
+    },
+    {
+      "routeFile": "server/src/routes/auth.js",
+      "count": 8
+    },
+    {
+      "routeFile": "server/src/routes/pm.js",
+      "count": 8
+    },
+    {
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "count": 7
+    },
+    {
+      "routeFile": "server/src/routes/runbooks.js",
+      "count": 7
+    },
+    {
+      "routeFile": "server/src/routes/chats.js",
+      "count": 6
+    },
+    {
+      "routeFile": "server/src/routes/accounts-microsoft.js",
+      "count": 5
+    },
+    {
+      "routeFile": "server/src/routes/personas.js",
+      "count": 5
+    },
+    {
+      "routeFile": "server/src/routes/providers.js",
+      "count": 5
+    },
+    {
+      "routeFile": "server/src/routes/accounts-google.js",
+      "count": 4
+    },
+    {
+      "routeFile": "server/src/routes/model-registry.js",
+      "count": 4
+    },
+    {
+      "routeFile": "server/src/routes/triage.js",
+      "count": 4
+    },
+    {
+      "routeFile": "server/src/routes/tasks.js",
+      "count": 3
+    },
+    {
+      "routeFile": "server/src/routes/context.js",
+      "count": 2
+    },
+    {
+      "routeFile": "server/src/routes/health.js",
+      "count": 2
+    },
+    {
+      "routeFile": "server/src/routes/runner-settings.js",
+      "count": 2
+    },
+    {
+      "routeFile": "server/src/routes/models.js",
+      "count": 1
+    },
+    {
+      "routeFile": "server/src/routes/slack.js",
+      "count": 1
+    },
+    {
+      "routeFile": "server/src/routes/summarize.js",
+      "count": 1
+    },
+    {
+      "routeFile": "server/src/routes/tools.js",
+      "count": 1
+    }
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/accounts/codex",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/codex",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/accounts/codex/:profileId",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/codex/:profileId/activate",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/codex/:profileId/login/start",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/codex/:profileId/logout",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/codex/prefs",
+      "routeFile": "server/src/routes/accounts-codex.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accounts/google",
+      "routeFile": "server/src/routes/accounts-google.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/google/:accountKey/connect/start",
+      "routeFile": "server/src/routes/accounts-google.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/google/:accountKey/disconnect",
+      "routeFile": "server/src/routes/accounts-google.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accounts/microsoft",
+      "routeFile": "server/src/routes/accounts-microsoft.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/microsoft/:accountKey/disconnect",
+      "routeFile": "server/src/routes/accounts-microsoft.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accounts/microsoft/callback",
+      "routeFile": "server/src/routes/accounts-microsoft.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accounts/microsoft/connect/start",
+      "routeFile": "server/src/routes/accounts-microsoft.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/authentication/options",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/authentication/verify",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/passkeys",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/auth/passkeys/:id",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/registration/options",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/registration/verify",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/status",
+      "routeFile": "server/src/routes/auth.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/chats",
+      "routeFile": "server/src/routes/chats.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/chats",
+      "routeFile": "server/src/routes/chats.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/chats/:chatId",
+      "routeFile": "server/src/routes/chats.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/chats/:chatId/messages",
+      "routeFile": "server/src/routes/chats.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/chats/:chatId/messages/stream",
+      "routeFile": "server/src/routes/chats.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/chats/:chatId/visibility",
+      "routeFile": "server/src/routes/chats.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/context",
+      "routeFile": "server/src/routes/context.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/context/metrics",
+      "routeFile": "server/src/routes/context.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "routeFile": "server/src/routes/health.js",
+      "auth": "public"
+    },
+    {
+      "method": "HEAD",
+      "path": "/api/health",
+      "routeFile": "server/src/routes/health.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/model-registry",
+      "routeFile": "server/src/routes/model-registry.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/model-registry",
+      "routeFile": "server/src/routes/model-registry.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/model-registry/:modelId",
+      "routeFile": "server/src/routes/model-registry.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/model-registry/:modelId/certify",
+      "routeFile": "server/src/routes/model-registry.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/models/vertex",
+      "routeFile": "server/src/routes/models.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ops/actions",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ops/actions/:actionId/status",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ops/flow",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ops/flow",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ops/flow/execute",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ops/flows",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ops/microsoft/preflight",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ops/overview",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ops/refresh",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ops/resolve-intent",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ops/resolve-intent/execute",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ops/timeline",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ops/triage/items/:itemId/draft/queue",
+      "routeFile": "server/src/routes/ops.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/people",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/people/:personId",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/people/:personId",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/aliases",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/aliases/resolve",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/bootstrap-me",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/gchat/sender",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/gchat/spaces",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/gchat/thread",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/people/identify",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/people/identities/:identityId",
+      "routeFile": "server/src/routes/people.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/personas",
+      "routeFile": "server/src/routes/personas.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/personas",
+      "routeFile": "server/src/routes/personas.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/personas/:personaId",
+      "routeFile": "server/src/routes/personas.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/personas/:personaId",
+      "routeFile": "server/src/routes/personas.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/personas/template/reset",
+      "routeFile": "server/src/routes/personas.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/commands",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/commands",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/commands/:taskId/claim",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/commands/:taskId/result",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/projects",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/pm/projects/:projectId",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/projects/:projectId",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/activity",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/checklist",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/messages/stream",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/size",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/title/refresh",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/trello/assign",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/projects/:projectId/trello/comment",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/projects/resolve",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/requests",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/requests",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/settings",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/pm/settings",
+      "routeFile": "server/src/routes/pm.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/trello/boards",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/trello/boards/:boardId/lists",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm/trello/cards/search",
+      "routeFile": "server/src/routes/pm-projects.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/providers",
+      "routeFile": "server/src/routes/providers.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/providers/openai",
+      "routeFile": "server/src/routes/providers.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/providers/openai",
+      "routeFile": "server/src/routes/providers.js",
+      "auth": "public"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/providers/vertex/service-account",
+      "routeFile": "server/src/routes/providers.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/providers/vertex/service-account",
+      "routeFile": "server/src/routes/providers.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/runbooks",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/runbooks/:runbookId",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/runbooks/:runbookId",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/runbooks/:runbookId/run-now",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/runbooks/:runbookId/runs",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/runbooks/bootstrap",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/runbooks/reload",
+      "routeFile": "server/src/routes/runbooks.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/runner",
+      "routeFile": "server/src/routes/runner-settings.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/runner",
+      "routeFile": "server/src/routes/runner-settings.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/slack/events",
+      "routeFile": "server/src/routes/slack.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/summarize",
+      "routeFile": "server/src/routes/summarize.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/:taskId",
+      "routeFile": "server/src/routes/tasks.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/:taskId/cancel",
+      "routeFile": "server/src/routes/tasks.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/:taskId/events",
+      "routeFile": "server/src/routes/tasks.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/tools/exec",
+      "routeFile": "server/src/routes/tools.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/triage/feedback",
+      "routeFile": "server/src/routes/triage.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/triage/items",
+      "routeFile": "server/src/routes/triage.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/triage/items/:itemId/priority",
+      "routeFile": "server/src/routes/triage.js",
+      "auth": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/triage/items/:itemId/status",
+      "routeFile": "server/src/routes/triage.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/oauth/google/callback",
+      "routeFile": "server/src/routes/accounts-google.js",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/oauth/microsoft/callback",
+      "routeFile": "server/src/routes/accounts-microsoft.js",
+      "auth": "public"
+    }
+  ]
+}

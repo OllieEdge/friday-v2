@@ -80,6 +80,13 @@ function createTriageQueries(db) {
     return getItem(id);
   }
 
+  function updateSource({ id, source }) {
+    const now = nowIso();
+    const srcJson = JSON.stringify(source && typeof source === "object" ? source : {});
+    db.prepare("UPDATE triage_items SET source_json = ?, updated_at = ? WHERE id = ?;").run(srcJson, now, id);
+    return getItem(id);
+  }
+
   function createFeedback({ itemId, kind, actor = "user", reason = null, outcome = null, notes = null, meta = null }) {
     const id = newId();
     const now = nowIso();
@@ -112,7 +119,7 @@ function createTriageQueries(db) {
     return rows.map(deserializeFeedback);
   }
 
-  return { listItems, getItem, createItem, setStatus, setPriority, createFeedback, listRecentFeedback };
+  return { listItems, getItem, createItem, setStatus, setPriority, updateSource, createFeedback, listRecentFeedback };
 }
 
 module.exports = { createTriageQueries };

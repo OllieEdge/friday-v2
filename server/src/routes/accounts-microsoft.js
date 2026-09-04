@@ -112,14 +112,29 @@ function registerMicrosoftAccounts(router, { microsoftAccounts }) {
     if (stateRow.accountKey !== accountKey) return sendJson(res, 400, { ok: false, error: "invalid_state" });
 
     const cfg = requireMicrosoftConfig();
-    const tokens = await exchangeCodeForTokens({
-      tenant: cfg.tenant,
-      code,
-      clientId: cfg.clientId,
-      clientSecret: cfg.clientSecret,
-      redirectUri: stateRow.redirectUri,
-      pkceVerifier: stateRow.pkceVerifier,
-    });
+    const hasClientSecret = Boolean(String(cfg.clientSecret || "").trim());
+    let tokens = null;
+    try {
+      tokens = await exchangeCodeForTokens({
+        tenant: cfg.tenant,
+        code,
+        clientId: cfg.clientId,
+        clientSecret: cfg.clientSecret,
+        redirectUri: stateRow.redirectUri,
+        pkceVerifier: stateRow.pkceVerifier,
+      });
+    } catch (err) {
+      const message = String(err?.message || err || "microsoft_token_exchange_failed");
+      if (!hasClientSecret && /AADSTS70002/i.test(message)) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: "missing_client_secret",
+          message:
+            "Microsoft OAuth app requires MICROSOFT_CLIENT_SECRET. Add it to friday-v2/.env on the Mac mini, restart com.friday.v2 and com.friday.v2.worker, then reconnect the Microsoft account.",
+        });
+      }
+      return sendJson(res, 400, { ok: false, error: "token_exchange_failed", message });
+    }
 
     const accessToken = String(tokens.access_token || "");
     const refreshToken = String(tokens.refresh_token || "");

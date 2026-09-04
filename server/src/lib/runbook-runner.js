@@ -4,6 +4,22 @@ const { nowIso } = require("../utils/time");
 const { loadRunbooksFromDir, updateRunbookFrontmatter } = require("./runbooks");
 const { estimateCostUsd } = require("./cost");
 
+function withTimeout(promise, timeoutMs, label) {
+  let timer = null;
+  return Promise.race([
+    promise.finally(() => {
+      if (timer) clearTimeout(timer);
+    }),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
+
+function resolveRunbookAssistantTimeoutMs() {
+  return Math.max(30_000, Number(process.env.RUNBOOK_ASSISTANT_TIMEOUT_MS || 180_000) || 180_000);
+}
+
 function triagePromptEnvelope({ runbook, accountKey, cursor, feedbackText }) {
   const cursorJson = cursor ? JSON.stringify(cursor) : "{}";
   return (
@@ -36,7 +52,8 @@ function triagePromptEnvelope({ runbook, accountKey, cursor, feedbackText }) {
     "}\n\n" +
     "Guidance:\n" +
     "- `priority`: perceived urgency/importance (0=low, 1=normal, 2=high, 3=urgent).\n" +
-    "- `confidence_pct`: how sure you are this is exactly what Oliver would do next.\n\n" +
+    "- `confidence_pct`: how sure you are this is exactly what Oliver would do next.\n" +
+    "- Even when commands fail, output valid triage JSON with best-effort cursor and `items: []`.\n\n" +
     "If there is nothing to triage, output items: [] and still update cursor if available.\n"
   );
 }
@@ -64,6 +81,33 @@ function parseTriageJson(text) {
   }
 }
 
+function parseRunbookFallback({ runbookId, accountKey, cursor, content }) {
+  const text = String(content || "").trim();
+  if (!text) return null;
+  const isGmailRunbook = String(runbookId || "") === "gmail-hourly-triage";
+  const looksLikeAuthIssue = /google|gmail/i.test(text) && /(token|auth|reconnect|revoked|expired|permission)/i.test(text);
+  if (isGmailRunbook && looksLikeAuthIssue) {
+    return {
+      cursor: cursor || null,
+      items: [
+        {
+          kind: "next_action",
+          priority: 2,
+          confidence_pct: 96,
+          title: `Reconnect Gmail account: ${accountKey}`,
+          summary_md: text,
+          source_key: `gmail:${accountKey}:auth:reconnect`,
+          source: {
+            gmail: { account: accountKey },
+            runbook: { id: runbookId, type: "auth_reconnect" },
+          },
+        },
+      ],
+    };
+  }
+  return null;
+}
+
 async function runRunbookOnce({
   runbook,
   accountKey,
@@ -77,6 +121,8 @@ async function runRunbookOnce({
   codexProfiles,
   getActiveCodexProfile,
   getCodexRunnerPrefs,
+  getAssistantRunnerPrefs,
+  googleAccounts,
 }) {
   const state = runbooksDb.getState(runbook.id);
   let runbookChatId = state?.chatId || null;
@@ -125,37 +171,75 @@ async function runRunbookOnce({
     feedbackText = "";
   }
 
-  const userContent = triagePromptEnvelope({ runbook, accountKey, cursor, feedbackText });
-  const userMsg = chats.appendMessage({ chatId: runbookChatId, role: "user", content: userContent });
+  let assistantMeta = task ? { run: { taskId: task.id, status: "running", startedAt: nowIso() } } : null;
+  let assistantMsg = null;
+  let context = null;
+  let userContent = "";
+  let userMsg = null;
 
-  const assistantMeta = task ? { run: { taskId: task.id, status: "running", startedAt: nowIso() } } : null;
-  const assistantMsg = chats.appendMessage({
-    chatId: runbookChatId,
-    role: "assistant",
-    content: "Running runbook…",
-    meta: assistantMeta,
-  });
+  try {
+    userContent = triagePromptEnvelope({ runbook, accountKey, cursor, feedbackText });
+    userMsg = chats.appendMessage({ chatId: runbookChatId, role: "user", content: userContent });
 
-  if (task && tasks) tasks.emit(task, { type: "status", stage: "loading_context" });
-  const context = loadContext();
-  if (task && tasks) tasks.emit(task, { type: "status", stage: "running" });
+    assistantMsg = chats.appendMessage({
+      chatId: runbookChatId,
+      role: "assistant",
+      content: "Running runbook…",
+      meta: assistantMeta,
+    });
+
+    if (task && tasks) tasks.emit(task, { type: "status", stage: "loading_context" });
+    context = loadContext();
+    if (task && tasks) tasks.emit(task, { type: "status", stage: "running" });
+  } catch (e) {
+    const msg = `runbook_prep_failed: ${String(e?.message || e)}`;
+    runbooksDb.finishRun({ id: run.id, status: "error", error: msg });
+    runbooksDb.upsertState({ runbookId: runbook.id, chatId: runbookChatId, lastRunAt: nowIso(), lastStatus: "error", lastError: msg });
+    if (task && tasks) tasks.finish(task, false, null);
+    return { ok: false, error: msg, taskId: task?.id || null, runId: run.id };
+  }
 
   try {
     const chat = chats.getChat(runbookChatId);
-    const result = await runAssistant({
-      context,
-      chat,
-      mode: "runbook",
-      onEvent: (ev) => {
-        if (task && tasks) tasks.emit(task, ev);
-        if (assistantMsg) chats.appendMessageEvent({ messageId: assistantMsg.id, event: ev });
-      },
-      getActiveCodexProfile,
-      getCodexRunnerPrefs,
-    });
+    const chatForAssistant = {
+      ...(chat || {}),
+      messages: [
+        {
+          id: userMsg?.id || `runbook-user-${Date.now()}`,
+          role: "user",
+          content: userContent,
+          createdAt: userMsg?.createdAt || nowIso(),
+        },
+      ],
+    };
+    const timeoutMs = resolveRunbookAssistantTimeoutMs();
+    const result = await withTimeout(
+      runAssistant({
+        context,
+        chat: chatForAssistant,
+        mode: "runbook",
+        routingHint: { lane: "triage" },
+        onEvent: (ev) => {
+          if (task && tasks) tasks.emit(task, ev);
+          if (assistantMsg) chats.appendMessageEvent({ messageId: assistantMsg.id, event: ev });
+        },
+        getActiveCodexProfile,
+        getCodexRunnerPrefs,
+        getAssistantRunnerPrefs,
+        googleAccounts,
+      }),
+      timeoutMs,
+      "runbook_assistant_timeout",
+    );
 
     const content = String(result?.content || "");
-    const parsed = parseTriageJson(content);
+    let parsed = parseTriageJson(content);
+    if (!parsed && !content.trim()) {
+      parsed = { cursor, items: [] };
+    }
+    if (!parsed) {
+      parsed = parseRunbookFallback({ runbookId: runbook.id, accountKey, cursor, content });
+    }
     if (!parsed) {
       const msg = "runbook_output_parse_failed";
       const errorMeta = task

@@ -11,6 +11,18 @@
 
 Friday v2 should treat these as canonical references when answering “how do I…?” about home ops.
 
+High-signal home-ops references in `ai`:
+
+- `AI_CONTEXT.md` for current gateway/service state
+- `runbooks/services/openvpn-preschool-gateway.md` for `Little Pickles Router` VPN, watchdogs, log caps, and router-admin-over-VPN access
+- `ai-context/23_MAC_MINI_SECURITY.md` for Mac mini access boundaries, PF exposure, security monitoring, SSH-log interpretation, and malicious-activity triage
+- When Friday needs router admin access guidance, prefer the documented Mac mini SSH port-forward path over any WAN remote-management advice
+
+Deterministic intent routing for this stack is defined in:
+
+- `ai-context/27_INTENT_ROUTING_HOME_OPS.md`
+- `ai-context/28_STACK_DETERMINISTIC_FLOWS.md`
+
 ## Friday v2 local tools
 
 - Google HTTP wrapper: `tools/google/google_http_request.mjs` (refresh-token based, per `work|personal`)

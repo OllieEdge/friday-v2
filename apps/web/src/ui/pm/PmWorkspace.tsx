@@ -17,6 +17,8 @@ import type {
 } from "../../api/types";
 import { MessageBubble } from "../MessageBubble";
 
+type PmLane = "planning" | "ops" | "triage" | "coding" | "highRisk";
+
 function formatTime(value?: string | null) {
   if (!value) return "";
   try {
@@ -24,6 +26,14 @@ function formatTime(value?: string | null) {
   } catch {
     return value;
   }
+}
+
+function inferPmLaneFromText(text: string): PmLane {
+  const haystack = String(text || "").toLowerCase();
+  if (/(microsoft|graph\.microsoft|azure|outlook|family safety|tenant)/.test(haystack)) return "ops";
+  if (/(gmail|email|inbox|triage|draft|reply)/.test(haystack)) return "triage";
+  if (/(typescript|javascript|bug|fix|build|compile|deploy|refactor|code)/.test(haystack)) return "coding";
+  return "planning";
 }
 
 function useTaskStream(taskId: string | null, onEvent: (ev: any) => void) {
@@ -47,6 +57,7 @@ export function PmWorkspace() {
   const [activeWorkers, setActiveWorkers] = React.useState<PmProjectWorker[]>([]);
 
   const [composer, setComposer] = React.useState("");
+  const [lane, setLane] = React.useState<PmLane>("planning");
   const [sending, setSending] = React.useState(false);
   const [currentStage, setCurrentStage] = React.useState<string | null>(null);
   const [currentTaskId, setCurrentTaskId] = React.useState<string | null>(null);
@@ -119,6 +130,11 @@ export function PmWorkspace() {
     }
   }, [activeProjectId, projects]);
 
+  React.useEffect(() => {
+    const title = String(activeProject?.title || "");
+    setLane(inferPmLaneFromText(title));
+  }, [activeProject?.id, activeProject?.title]);
+
   useTaskStream(currentTaskId, (ev) => {
     const t = String(ev?.type || "");
     if (t === "status") setCurrentStage(ev.stage || null);
@@ -140,11 +156,12 @@ export function PmWorkspace() {
     if (!activeProject) return;
     const content = composer.trim();
     if (!content) return;
+    const selectedLane = lane === "planning" ? inferPmLaneFromText(`${activeProject.title}\n${content}`) : lane;
     setSending(true);
     try {
       const res = await api<PmProjectMessageResponse>(`/api/pm/projects/${activeProject.id}/messages/stream`, {
         method: "POST",
-        body: JSON.stringify({ content, source: "human" }),
+        body: JSON.stringify({ content, source: "human", lane: selectedLane }),
       });
       setComposer("");
       setCurrentTaskId(res.taskId);
@@ -355,6 +372,19 @@ export function PmWorkspace() {
                   void sendMessage();
                 }}
               />
+              <select
+                className="input"
+                value={lane}
+                onChange={(e) => setLane(e.target.value as PmLane)}
+                disabled={sending}
+                aria-label="PM lane"
+              >
+                <option value="planning">Lane: Planning</option>
+                <option value="ops">Lane: Ops</option>
+                <option value="triage">Lane: Triage</option>
+                <option value="coding">Lane: Coding</option>
+                <option value="highRisk">Lane: High Risk</option>
+              </select>
               <button className="btn primary" type="submit" disabled={sending}>
                 Send
               </button>

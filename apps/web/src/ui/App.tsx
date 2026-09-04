@@ -1,4 +1,4 @@
-import { LayoutList, ListTodo, Menu, MessageSquare, Plus, Settings2, Users, X } from "lucide-react";
+import { ActivitySquare, LayoutList, Menu, MessageSquare, Plus, Settings2, Workflow, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type {
@@ -9,14 +9,14 @@ import type {
   ContextBundle,
   ContextMetrics,
   Message,
-  RunnerSettingsResponse,
+  MicrosoftAccountsResponse,
 } from "../api/types";
 import { AuthOverlay } from "./AuthOverlay";
 import { MessageBubble } from "./MessageBubble";
 import { SettingsPage } from "./SettingsPage";
 import { TriagePage } from "./TriagePage";
-import { PmWorkspace } from "./pm/PmWorkspace";
-import { ContactsPage } from "./ContactsPage";
+import { OpsPage } from "./OpsPage";
+import { FlowBuilderPage } from "./FlowBuilderPage";
 
 type ChatsListResponse = { ok: true; chats: ChatSummary[] };
 type ChatResponse = { ok: true; chat: Chat };
@@ -25,6 +25,16 @@ type ContextResponse = { ok: true; context: ContextBundle };
 type ContextMetricsResponse = { ok: true; metrics: ContextMetrics };
 type AppendMessagesResponse = { ok: true; messages: Array<{ id: string; role: string; content: string }> };
 type StartStreamResponse = { ok: true; taskId: string; userMessage: Message; assistantMessage: Message };
+type MicrosoftPreflightResponse = {
+  ok: true;
+  preflight: {
+    generatedAt: string;
+    node: { ok: boolean; version: string; stderr: string; path: string };
+    tool: { exists: boolean; path: string };
+    accounts: Array<{ accountKey: string; label: string; kind: string; email: string; scopes: string; updatedAt: string }>;
+    probes: Array<{ accountKey: string; ok: boolean; code: number | null; stderr: string; profile: { id: string; displayName: string; mail: string } | null }>;
+  };
+};
 
 export function App() {
   const [authStatus, setAuthStatus] = useState<AuthStatusResponse | null>(null);
@@ -33,7 +43,8 @@ export function App() {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "triage" | "pm" | "contacts" | "settings">("chat");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [view, setView] = useState<"chat" | "triage" | "ops" | "flows" | "settings">("ops");
 
   const [contextVisible, setContextVisible] = useState(false);
   const [context, setContext] = useState<ContextBundle | null>(null);
@@ -42,30 +53,11 @@ export function App() {
   const [composer, setComposer] = useState("");
 
   const [accounts, setAccounts] = useState<CodexAccountsResponse | null>(null);
-  const [runnerSettings, setRunnerSettings] = useState<RunnerSettingsResponse | null>(null);
   const [sending, setSending] = useState(false);
   const taskStreamsRef = useRef<Map<string, EventSource>>(new Map());
   const seenEventsRef = useRef<Map<string, Set<string>>>(new Map());
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const lastChatIdRef = useRef<string | null>(null);
-
-  const activeAccountLabel = useMemo(() => {
-    if (!accounts?.activeProfileId) return "No active account";
-    const profile = accounts.profiles.find((p) => p.id === accounts.activeProfileId);
-    return profile ? `Active: ${profile.label}` : "Active: (unknown)";
-  }, [accounts]);
-
-  const activeUsageLabel = useMemo(() => {
-    if (!accounts?.activeProfileId) return "";
-    const p = accounts.profiles.find((x) => x.id === accounts.activeProfileId);
-    if (!p) return "";
-    if (p.authMode !== "api_key") return "";
-    const cost = Number(p.totalCostUsd || 0);
-    const estimatedCost = Number(p.estimatedTotalCostUsd || 0);
-    const tokens = (Number(p.totalInputTokens) || 0) + (Number(p.totalCachedInputTokens) || 0) + (Number(p.totalOutputTokens) || 0);
-    const costPart = cost > 0 ? ` · $${cost.toFixed(2)}` : estimatedCost > 0 ? ` · ~$${estimatedCost.toFixed(2)}` : "";
-    return `Metered: ${tokens.toLocaleString()} tokens${costPart}`;
-  }, [accounts]);
 
   const chatHasRunningTask = useMemo(() => {
     return Boolean(activeChat?.messages?.some((m) => m.role === "assistant" && m.meta?.run?.status === "running" && m.meta?.run?.taskId));
@@ -84,7 +76,9 @@ export function App() {
     setActiveChat(null);
     setActiveChatId(null);
     setChats([]);
-    setViewAndRoute("chat");
+    setSidebarOpen(false);
+    setMobileMenuOpen(false);
+    setViewAndRoute("ops");
   }
 
   async function refreshChats() {
@@ -103,6 +97,7 @@ export function App() {
       const res = await api<ChatResponse>(`/api/chats/${chatId}`);
       setActiveChat(res.chat);
       setSidebarOpen(false);
+      setMobileMenuOpen(false);
       await refreshChats();
     } catch (e: any) {
       if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
@@ -144,15 +139,6 @@ export function App() {
     try {
       const res = await api<CodexAccountsResponse>("/api/accounts/codex");
       setAccounts(res);
-    } catch (e: any) {
-      if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
-    }
-  }
-
-  async function refreshRunnerSettings() {
-    try {
-      const res = await api<RunnerSettingsResponse>("/api/settings/runner");
-      setRunnerSettings(res);
     } catch (e: any) {
       if (String(e?.message || "").includes("unauthorized")) handleUnauthorized();
     }
@@ -259,6 +245,7 @@ export function App() {
     const content = composer.trim();
     if (!chatId || !content) return;
     if (busy) return;
+    const lane = /microsoft\s+ops/i.test(String(activeChat?.title || "")) ? "ops" : "";
 
     setComposer("");
     setSending(true);
@@ -276,7 +263,7 @@ export function App() {
     try {
       const started = await api<StartStreamResponse>(`/api/chats/${chatId}/messages/stream`, {
         method: "POST",
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(lane ? { content, lane } : { content }),
       });
 
       // Replace optimistic messages with persisted ones.
@@ -310,6 +297,73 @@ export function App() {
     }
   }
 
+  function buildMicrosoftOpsPrompt(accountKey: string, preflight?: MicrosoftPreflightResponse["preflight"] | null) {
+    const lines = [];
+    if (preflight) {
+      lines.push("Preflight (authoritative):");
+      lines.push(`- node: ${preflight.node.ok ? "ok" : "fail"} ${preflight.node.version || ""}`.trim());
+      lines.push(`- nodePath: ${preflight.node.path}`);
+      lines.push(`- toolExists: ${preflight.tool.exists ? "yes" : "no"} (${preflight.tool.path})`);
+      const probe = (preflight.probes || []).find((p) => String(p.accountKey || "") === accountKey);
+      if (probe) {
+        lines.push(`- graphMeProbe(${accountKey}): ${probe.ok ? "ok" : "fail"}${probe.profile?.mail ? ` (${probe.profile.mail})` : ""}`);
+        if (!probe.ok && probe.stderr) lines.push(`- graphMeProbeErr: ${probe.stderr}`);
+      }
+      lines.push("If command execution is unavailable, cite the exact failed preflight line above.");
+      lines.push("");
+    }
+
+    return [
+      ...lines,
+      `Use Microsoft account \`${accountKey}\`.`,
+      "",
+      "Task mode: Microsoft Ops (ad-hoc, discover-first).",
+      "1. Discover API/tool options first using available tools/http requests.",
+      "2. Run read-only checks before proposing any write action.",
+      "3. If write is possible, show exact request and wait for explicit approval.",
+      "4. If no API exists, provide exact manual click path and a draft message.",
+      "5. Keep output concise and action-focused.",
+      "6. Do not claim shell/path failures unless you have concrete command output from this run or preflight evidence.",
+      "",
+      "Current task: investigate how to adjust Microsoft Family settings for app/site controls and report the safest executable path.",
+    ].join("\n");
+  }
+
+  async function startMicrosoftOpsChat() {
+    let preflight: MicrosoftPreflightResponse["preflight"] | null = null;
+    try {
+      const pf = await api<MicrosoftPreflightResponse>("/api/ops/microsoft/preflight");
+      preflight = pf.preflight || null;
+    } catch {
+      preflight = null;
+    }
+
+    const ms = await api<MicrosoftAccountsResponse>("/api/accounts/microsoft");
+    const connected = (ms.accounts || []).filter((a) => a.connected);
+    if (!connected.length) {
+      setViewAndRoute("settings");
+      throw new Error("No connected Microsoft account. Connect one in Settings -> Accounts -> Microsoft.");
+    }
+    const chosen = connected.find((a) => String(a.accountKey || "") === "esbokid") || connected[0];
+    const accountKey = String(chosen.accountKey || "").trim();
+    if (!accountKey) throw new Error("Connected Microsoft account key is missing.");
+
+    const created = await api<CreateChatResponse>("/api/chats", {
+      method: "POST",
+      body: JSON.stringify({ title: `Microsoft Ops (${accountKey})` }),
+    });
+    const chatId = created.chat.id;
+    const prompt = buildMicrosoftOpsPrompt(accountKey, preflight);
+    const started = await api<StartStreamResponse>(`/api/chats/${chatId}/messages/stream`, {
+      method: "POST",
+      body: JSON.stringify({ content: prompt, lane: "ops" }),
+    });
+    await loadChat(chatId);
+    if (started.assistantMessage?.id) {
+      await attachTaskStream({ taskId: started.taskId, messageId: started.assistantMessage.id });
+    }
+  }
+
   useEffect(() => {
     (async () => {
       const st = await refreshAuthStatus();
@@ -317,23 +371,26 @@ export function App() {
       if (!st.authenticated && !st.hasAnyUsers) return;
       await refreshChats();
       await refreshAccounts();
-      await refreshRunnerSettings();
       await refreshContextMetrics();
     })();
   }, []);
 
   function viewFromPath(path: string) {
+    if (!path || path === "/") return "ops";
     if (path.startsWith("/triage")) return "triage";
-    if (path.startsWith("/pm")) return "pm";
-    if (path.startsWith("/contacts")) return "contacts";
+    if (path.startsWith("/ops")) return "ops";
+    if (path.startsWith("/flows")) return "flows";
+    if (path.startsWith("/pm")) return "settings";
+    if (path.startsWith("/contacts")) return "settings";
     if (path.startsWith("/settings")) return "settings";
-    return "chat";
+    if (path.startsWith("/chats")) return "chat";
+    return "ops";
   }
 
   function pathForView(nextView: typeof view) {
     if (nextView === "triage") return "/triage";
-    if (nextView === "pm") return "/pm";
-    if (nextView === "contacts") return "/contacts";
+    if (nextView === "ops") return "/ops";
+    if (nextView === "flows") return "/flows";
     if (nextView === "settings") return "/settings";
     return "/chats";
   }
@@ -346,8 +403,22 @@ export function App() {
     }
   }
 
+  function goToView(nextView: typeof view) {
+    setSidebarOpen(false);
+    setMobileMenuOpen(false);
+    setViewAndRoute(nextView);
+  }
+
   useEffect(() => {
-    const sync = () => setView(viewFromPath(window.location.pathname || "/"));
+    const sync = () => {
+      const path = window.location.pathname || "/";
+      if (path === "/") {
+        window.history.replaceState({}, "", "/ops");
+        setView("ops");
+        return;
+      }
+      setView(viewFromPath(path));
+    };
     sync();
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
@@ -395,73 +466,20 @@ export function App() {
     return context.items.map((i) => `# ${i.filename}\n\n${i.content.trim()}\n`).join("\n\n---\n\n");
   }, [context]);
 
-  const runnerMeta = useMemo(() => {
-    if (!runnerSettings) return "";
-    const runner = runnerSettings.effective?.runner || runnerSettings.prefs.runner || "unknown";
-    const parts: string[] = [`Runner: ${runner}`];
-    if (runner === "vertex") {
-      const model = runnerSettings.prefs.vertex.model || "default";
-      const location = runnerSettings.prefs.vertex.location || "";
-      parts.push(`Model: ${model}`);
-      if (location) parts.push(`Location: ${location}`);
-      const contextWindow = model === "gemini-2.5-pro" ? 1048576 : 0;
-      if (contextWindow) parts.push(`Context window: ${contextWindow.toLocaleString()}`);
-      const hasToolExec = Boolean(runnerSettings.caps?.vertexToolExec);
-      const hasCodeExec = Boolean(runnerSettings.caps?.vertexCodeExecution);
-      if (hasToolExec && hasCodeExec) parts.push("Tools: exec + code-exec");
-      else if (hasToolExec) parts.push("Tools: exec");
-      else if (hasCodeExec) parts.push("Tools: code-exec");
-      else parts.push("Tools: text-only");
-    } else if (runner === "openai" || runner === "api" || runner === "metered") {
-      const model = runnerSettings.prefs.openai.model || "";
-      if (model) parts.push(`Model: ${model}`);
-      parts.push("Tools: text-only");
-    } else if (runner === "codex") {
-      parts.push("Tools: enabled");
-    }
-    return parts.join(" · ");
-  }, [runnerSettings]);
-
-  const lastUsage = useMemo(() => {
-    const msgs = activeChat?.messages || [];
-    for (let i = msgs.length - 1; i >= 0; i -= 1) {
-      const msg = msgs[i];
-      if (msg?.role !== "assistant") continue;
-      const events = Array.isArray(msg.events) ? msg.events : [];
-      for (let j = events.length - 1; j >= 0; j -= 1) {
-        const ev = events[j];
-        if (ev?.type === "usage" && ev?.usage) return ev.usage;
-      }
-    }
-    return null;
-  }, [activeChat]);
-
-  const usageMeta = useMemo(() => {
-    if (!lastUsage) return "";
-    const inTok = Number(lastUsage.inputTokens) || 0;
-    const cachedTok = Number(lastUsage.cachedInputTokens) || 0;
-    const outTok = Number(lastUsage.outputTokens) || 0;
-    if (!inTok && !cachedTok && !outTok) return "";
-    const parts = [`Last run: in ${inTok.toLocaleString()}`];
-    if (cachedTok) parts.push(`cached ${cachedTok.toLocaleString()}`);
-    parts.push(`out ${outTok.toLocaleString()}`);
-    return parts.join(" · ");
-  }, [lastUsage]);
-
   const viewTitle =
     view === "triage"
       ? "Triage"
-      : view === "pm"
-        ? "PM"
-        : view === "contacts"
-          ? "Contacts"
-          : view === "settings"
-            ? "Settings"
-            : activeChat?.title || "Select a chat";
+      : view === "ops"
+        ? "Ops"
+        : view === "flows"
+          ? "Flows"
+        : view === "settings"
+          ? "Settings"
+          : activeChat?.title || "Select a chat";
 
   return (
     <div
-      className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" || view === "pm" || view === "contacts" || view === "settings" ? " triageMode" : ""}`}
+      className={`app${sidebarOpen ? " sidebarOpen" : ""}${view === "triage" || view === "ops" || view === "flows" || view === "settings" ? " triageMode" : ""}`}
     >
       {authStatus && !authStatus.authenticated ? (
         <AuthOverlay
@@ -507,26 +525,43 @@ export function App() {
         <header className="topbar">
           <div className="topbarLeft">
             <div className="topbarTitleRow">
-              {view === "chat" ? (
-                <button className="btn iconBtn mobileOnly" onClick={() => setSidebarOpen((v) => !v)} title="Chats">
-                  {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-                </button>
-              ) : null}
+              <button className="btn iconBtn mobileOnly" onClick={() => setMobileMenuOpen((v) => !v)} title="Menu">
+                {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
               <div className="chatTitle">{viewTitle}</div>
             </div>
-            <div className="activeAccount">
-              {activeAccountLabel}
-              {contextMetrics ? ` · Context ~${contextMetrics.approxTokens.toLocaleString()} tokens` : ""}
-              {activeUsageLabel ? ` · ${activeUsageLabel}` : ""}
-            </div>
-            {view === "chat" && (runnerMeta || usageMeta) ? (
-              <div className="chatMeta">
-                {runnerMeta}
-                {usageMeta ? ` · ${usageMeta}` : ""}
-              </div>
-            ) : null}
           </div>
           <div className="topbarRight">
+            <button
+              className={`btn${view === "ops" ? " secondary" : ""}`}
+              onClick={() => {
+                goToView("ops");
+              }}
+              title="Ops"
+            >
+              <ActivitySquare size={16} />
+              Ops
+            </button>
+            <button
+              className={`btn${view === "triage" ? " secondary" : ""}`}
+              onClick={() => {
+                goToView("triage");
+              }}
+              title="Triage"
+            >
+              <LayoutList size={16} />
+              Triage
+            </button>
+            <button
+              className={`btn${view === "flows" ? " secondary" : ""}`}
+              onClick={() => {
+                goToView("flows");
+              }}
+              title="Flows"
+            >
+              <Workflow size={16} />
+              Flows
+            </button>
             {view === "chat" ? (
               <button
                 className="btn secondary"
@@ -539,42 +574,69 @@ export function App() {
                 Context
               </button>
             ) : null}
-            <button className={`btn${view === "chat" ? " secondary" : ""}`} onClick={() => setViewAndRoute("chat")} title="Chats">
+            <button className={`btn${view === "chat" ? " secondary" : ""}`} onClick={() => goToView("chat")} title="Chats">
               <MessageSquare size={16} />
               Chats
             </button>
-            <button
-              className={`btn${view === "triage" ? " secondary" : ""}`}
-              onClick={() => {
-                setSidebarOpen(false);
-                setViewAndRoute("triage");
-              }}
-              title="Triage"
-            >
-              <LayoutList size={16} />
-              Triage
-            </button>
-            <button
-              className={`btn${view === "pm" ? " secondary" : ""}`}
-              onClick={() => {
-                setSidebarOpen(false);
-                setViewAndRoute("pm");
-              }}
-              title="PM"
-            >
-              <ListTodo size={16} />
-              PM
-            </button>
-            <button className={`btn${view === "contacts" ? " secondary" : ""}`} onClick={() => setViewAndRoute("contacts")} title="Contacts">
-              <Users size={16} />
-              Contacts
-            </button>
-            <button className={`btn${view === "settings" ? " secondary" : ""}`} onClick={() => setViewAndRoute("settings")} title="Settings">
+            <button className={`btn${view === "settings" ? " secondary" : ""}`} onClick={() => goToView("settings")} title="Settings">
               <Settings2 size={16} />
               Settings
             </button>
           </div>
         </header>
+
+        {mobileMenuOpen ? (
+          <>
+            <button className="mobileMenuBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu" />
+            <nav className="mobileMenuPanel" aria-label="Main">
+              <button className={`btn${view === "ops" ? " secondary" : ""}`} onClick={() => goToView("ops")}>
+                <ActivitySquare size={16} />
+                Ops
+              </button>
+              <button className={`btn${view === "triage" ? " secondary" : ""}`} onClick={() => goToView("triage")}>
+                <LayoutList size={16} />
+                Triage
+              </button>
+              <button className={`btn${view === "flows" ? " secondary" : ""}`} onClick={() => goToView("flows")}>
+                <Workflow size={16} />
+                Flows
+              </button>
+              <button className={`btn${view === "chat" ? " secondary" : ""}`} onClick={() => goToView("chat")}>
+                <MessageSquare size={16} />
+                Chats
+              </button>
+              <button className={`btn${view === "settings" ? " secondary" : ""}`} onClick={() => goToView("settings")}>
+                <Settings2 size={16} />
+                Settings
+              </button>
+              {view === "chat" ? (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setSidebarOpen(true);
+                  }}
+                >
+                  <MessageSquare size={16} />
+                  Conversations
+                </button>
+              ) : null}
+              {view === "chat" ? (
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    setMobileMenuOpen(false);
+                    await ensureContext();
+                    await refreshContextMetrics();
+                    setContextVisible((v) => !v);
+                  }}
+                >
+                  Context
+                </button>
+              ) : null}
+            </nav>
+          </>
+        ) : null}
 
         {view === "chat" ? (
           <>
@@ -613,13 +675,13 @@ export function App() {
           <section className="triageMain">
             <TriagePage onOpenChat={(chatId) => loadChat(chatId)} />
           </section>
-        ) : view === "pm" ? (
-          <section className="triageMain">
-            <PmWorkspace />
+        ) : view === "ops" ? (
+          <section className="triageMain opsMainShell">
+            <OpsPage onLaunchMicrosoftOps={startMicrosoftOpsChat} />
           </section>
-        ) : view === "contacts" ? (
-          <section className="triageMain">
-            <ContactsPage />
+        ) : view === "flows" ? (
+          <section className="triageMain flowMainShell">
+            <FlowBuilderPage />
           </section>
         ) : (
           <section className="triageMain">

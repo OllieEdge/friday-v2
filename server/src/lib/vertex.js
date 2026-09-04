@@ -558,6 +558,7 @@ async function runVertexChat({
   googleAccountKey,
   serviceAccountJson,
   toolHandler,
+  maxOutputTokens,
 }) {
   const systemText = normalizeString(system);
   const messagePrompt = buildConversationPrompt({ system: "", messages });
@@ -621,6 +622,7 @@ async function runVertexChat({
       googleAccounts,
       googleAccountKey,
       serviceAccountJson,
+      maxOutputTokens,
     });
     totalUsage = sumUsage(totalUsage, result.usage);
 
@@ -653,6 +655,7 @@ async function runVertexChat({
         googleAccounts,
         googleAccountKey,
         serviceAccountJson,
+        maxOutputTokens,
       });
       totalUsage = sumUsage(totalUsage, result.usage);
       iterations += 1;
@@ -672,10 +675,21 @@ async function runVertexChat({
       googleAccounts,
       googleAccountKey,
       serviceAccountJson,
+      maxOutputTokens,
     });
   }
 
-  return vertexGenerateText({ projectId, location, model, prompt: fullPrompt, authMode, googleAccounts, googleAccountKey, serviceAccountJson });
+  return vertexGenerateText({
+    projectId,
+    location,
+    model,
+    prompt: fullPrompt,
+    authMode,
+    googleAccounts,
+    googleAccountKey,
+    serviceAccountJson,
+    maxOutputTokens,
+  });
 }
 
 async function vertexProbeModelIds({ projectId, location, modelIds, authMode, googleAccounts, googleAccountKey, serviceAccountJson, accessToken: accessTokenOverride }) {

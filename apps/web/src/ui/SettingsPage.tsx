@@ -2,11 +2,13 @@ import { ChevronLeft, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import type { CodexAccountsResponse, ContextMetrics } from "../api/types";
 import { AccountsPanel } from "./accounts/AccountsPanel";
-import { PmPanel } from "./pm/PmPanel";
+import { ContactsPage } from "./ContactsPage";
+import { ModelsSettingsPage } from "./models/ModelsSettingsPage";
+import { PersonasSettingsPage } from "./personas/PersonasSettingsPage";
 import { ScheduledPanel } from "./runbooks/ScheduledPanel";
 import { SecurityPanel } from "./security/SecurityPanel";
 
-type Section = "accounts" | "scheduled" | "pm" | "security";
+type Section = "accounts" | "models" | "scheduled" | "personas" | "contacts" | "security";
 
 export function SettingsPage({
   onClose,
@@ -27,8 +29,10 @@ export function SettingsPage({
 
   const title = useMemo(() => {
     if (section === "accounts") return "Accounts";
+    if (section === "models") return "Models";
     if (section === "scheduled") return "Scheduled";
-    if (section === "pm") return "PM";
+    if (section === "personas") return "Personas";
+    if (section === "contacts") return "Contacts";
     if (section === "security") return "Security";
     return "Settings";
   }, [section]);
@@ -60,16 +64,28 @@ export function SettingsPage({
             Accounts
           </button>
           <button
+            className={`settingsNavItem${section === "models" ? " active" : ""}`}
+            onClick={() => setSection("models")}
+          >
+            Models
+          </button>
+          <button
             className={`settingsNavItem${section === "scheduled" ? " active" : ""}`}
             onClick={() => setSection("scheduled")}
           >
             Scheduled
           </button>
           <button
-            className={`settingsNavItem${section === "pm" ? " active" : ""}`}
-            onClick={() => setSection("pm")}
+            className={`settingsNavItem${section === "personas" ? " active" : ""}`}
+            onClick={() => setSection("personas")}
           >
-            PM
+            Personas
+          </button>
+          <button
+            className={`settingsNavItem${section === "contacts" ? " active" : ""}`}
+            onClick={() => setSection("contacts")}
+          >
+            Contacts
           </button>
           <button
             className={`settingsNavItem${section === "security" ? " active" : ""}`}
@@ -82,10 +98,14 @@ export function SettingsPage({
         <div className="settingsContent">
           {section === "accounts" ? (
             <AccountsPanel accounts={accounts} refreshAccounts={refreshAccounts} contextMetrics={contextMetrics} />
+          ) : section === "models" ? (
+            <ModelsSettingsPage />
           ) : section === "scheduled" ? (
             <ScheduledPanel />
-          ) : section === "pm" ? (
-            <PmPanel />
+          ) : section === "personas" ? (
+            <PersonasSettingsPage />
+          ) : section === "contacts" ? (
+            <ContactsPage />
           ) : section === "security" ? (
             <SecurityPanel onLoggedOut={onLoggedOut} />
           ) : null}

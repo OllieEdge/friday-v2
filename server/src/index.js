@@ -32,11 +32,14 @@ const { registerGoogleAccounts } = require("./routes/accounts-google");
 const { registerMicrosoftAccounts } = require("./routes/accounts-microsoft");
 const { registerRunnerSettings } = require("./routes/runner-settings");
 const { registerModels } = require("./routes/models");
+const { registerModelRegistry } = require("./routes/model-registry");
 const { registerTools } = require("./routes/tools");
 const { registerTriage } = require("./routes/triage");
 const { registerSlack } = require("./routes/slack");
 const { registerRunbooks } = require("./routes/runbooks");
+const { registerOps } = require("./routes/ops");
 const { registerPeople } = require("./routes/people");
+const { registerPersonas } = require("./routes/personas");
 const { registerAuth, requireUser } = require("./routes/auth");
 const { runAssistant } = require("./lib/runner");
 const { listRunbooks, runRunbookOnce, updateRunbookFile } = require("./lib/runbook-runner");
@@ -113,8 +116,15 @@ registerGoogleAccounts(router, { googleAccounts });
 registerMicrosoftAccounts(router, { microsoftAccounts });
 registerRunnerSettings(router, { settings });
 registerModels(router, { settings, googleAccounts });
+registerModelRegistry(router, {
+  settings,
+  googleAccounts,
+  getActiveCodexProfile,
+  getCodexRunnerPrefs,
+});
 registerTools(router);
 registerPeople(router, { people, googleAccounts });
+registerPersonas(router);
 registerTriage(router, { triage });
 registerSlack(router, { chats, triage, tasks });
 registerRunbooks(router, {
@@ -129,9 +139,26 @@ registerRunbooks(router, {
   getActiveCodexProfile,
   getCodexRunnerPrefs,
   getAssistantRunnerPrefs,
+  googleAccounts,
   listRunbooks,
   runRunbookOnce,
   updateRunbookFile,
+});
+registerOps(router, {
+  runbooksDir: RUNBOOKS_DIR,
+  runbooksDb,
+  chats,
+  triage,
+  microsoftAccounts,
+  tasks,
+  codexProfiles,
+  loadContext,
+  runAssistant,
+  getActiveCodexProfile,
+  getCodexRunnerPrefs,
+  getAssistantRunnerPrefs,
+  googleAccounts,
+  runRunbookOnce,
 });
 
 const server = http.createServer(async (req, res) => {
@@ -193,6 +220,7 @@ startScheduler({
         getActiveCodexProfile,
         getCodexRunnerPrefs,
         getAssistantRunnerPrefs,
+        googleAccounts,
       });
     }
   },
