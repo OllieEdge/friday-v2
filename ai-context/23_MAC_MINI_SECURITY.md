@@ -57,7 +57,7 @@ The hardening anchor must contain loaded `block drop` rules and explicit passes 
 - blocked SSH packet log: `/var/log/edgflix-security-monitor/ssh.log` (rotates at 5 MB, keeping five old files)
 - capture errors: `/var/log/edgflix-security-monitor/ssh-capture.err.log`
 
-The monitor checks known indicators of compromise, persistence locations, protected-file integrity, new non-loopback listeners, CPU/load anomalies, temporary executables, host security posture, live SSH sources, and blocked public SSH attempts. It sends alerts and recovery notices through its configured notification channel.
+The monitor checks known indicators of compromise, persistence locations, protected-file integrity, new non-loopback listeners, CPU/load anomalies, temporary executables, host security posture, live SSH sources, and blocked public SSH attempts. Discord is reserved for actionable critical conditions; informational events, blocked probes, routine summaries, and recoveries remain in local logs. Equivalent critical alerts are deduplicated for six hours.
 
 Quick read-only health check:
 
