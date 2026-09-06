@@ -27,7 +27,7 @@ export function AuthOverlay({
     setBusy(true);
     try {
       const { options } = await api<AuthenticationOptionsResponse>("/api/auth/authentication/options", { method: "POST", body: "{}" });
-      const resp = await startAuthentication(options);
+      const resp = await startAuthentication({ optionsJSON: options });
       await api<AuthenticationVerifyResponse>("/api/auth/authentication/verify", {
         method: "POST",
         body: JSON.stringify({ challenge: options.challenge, response: resp }),
@@ -53,7 +53,7 @@ export function AuthOverlay({
         method: "POST",
         body: JSON.stringify({ label: trimmed }),
       });
-      const resp = await startRegistration(options);
+      const resp = await startRegistration({ optionsJSON: options });
       await api<RegistrationVerifyResponse>("/api/auth/registration/verify", {
         method: "POST",
         body: JSON.stringify({ challenge: options.challenge, response: resp }),

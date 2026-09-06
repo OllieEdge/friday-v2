@@ -31,7 +31,7 @@ export function SecurityPanel({ onLoggedOut }: { onLoggedOut: () => Promise<void
     setError(null);
     try {
       const { options } = await api<RegistrationOptionsResponse>("/api/auth/registration/options", { method: "POST", body: "{}" });
-      const resp = await startRegistration(options);
+      const resp = await startRegistration({ optionsJSON: options });
       await api<RegistrationVerifyResponse>("/api/auth/registration/verify", {
         method: "POST",
         body: JSON.stringify({ challenge: options.challenge, response: resp }),
